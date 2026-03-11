@@ -1025,8 +1025,8 @@ function MyBookings({ bookings, setBookings, staffList, schedule, classInstances
                         {b.freeClass && <Pill color={C.sage}>Free</Pill>}
                         {b.status === "cancelled" && <Pill color={C.silver}>Cancelled</Pill>}
                       </div>
+                      {b.note && <div style={{ fontSize: 13, fontWeight: 800, color: C.rust, marginBottom: 6, background: C.rust + "12", borderRadius: 8, padding: "6px 10px" }}>📢 {b.note}</div>}
                       <div style={{ fontSize: 13, color: C.silver }}>{b.weeks === 1 ? fmtDate(b.startDate) : `${b.weeks} sessions · Starts ${fmtDate(b.startDate)}`} · {fmt12(b.time)}</div>
-                      {b.note && <div style={{ fontSize: 12, color: C.gold, marginTop: 3, fontStyle: "italic" }}>📝 {b.note}</div>}
                       <div style={{ fontSize: 13, color: C.gold }}>with {b.trainerName}{b.price > 0 ? ` · $${b.price}` : " · Free"}</div>
                       {b.waitlisted && <div style={{ marginTop: 8, background: C.sky + "22", borderRadius: 8, padding: "6px 10px", fontSize: 13, color: C.sky }}>On waitlist — you'll be notified if a spot opens!</div>}
                       {tooLateToCancelFree && <div style={{ fontSize: 12, color: C.rust, marginTop: 4 }}>⚠ Within 1 hour of class — cancellation unavailable</div>}
@@ -1620,7 +1620,7 @@ function CalendarView({ currentUser, staff, clients, sessions, classInstances, c
         {!compact && ev.sub && <div style={{ fontSize: 10, color: C.steel, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ev.sub}</div>}
       {!compact && ev.isInHome && ev.address && <div style={{ fontSize: 10, color: C.gold, fontWeight: 700, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>📍 {ev.address}</div>}
       {!compact && ev.isInHome && ev.phone && <div style={{ fontSize: 10, color: C.steel, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>📞 {ev.phone}</div>}
-      {!compact && ev.note && <div style={{ fontSize: 10, color: C.gold, fontStyle: "italic", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>📝 {ev.note}</div>}
+      {!compact && ev.note && <div style={{ fontSize: 10, fontWeight: 800, color: C.rust, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>📢 {ev.note}</div>}
       </div>
     );
   };
@@ -2218,7 +2218,7 @@ function Classes({ currentUser, staff, clients, classTemplates, setClassTemplate
                       {inst.skipDates?.length > 0 && <span style={{ color: C.rust, marginLeft: 6 }}>· Skipping {inst.skipDates.map(d => fmtDateShort(d)).join(", ")}</span>}
                     </div>
                     <div style={{ fontSize: 13, color: C.gold, marginTop: 2 }}>Instructor: {instructor?.name} · ${tmpl?.price}/enrollment</div>
-                    {inst.note && <div style={{ fontSize: 12, color: C.steel, marginTop: 4, fontStyle: "italic" }}>📝 {inst.note}</div>}
+                    {inst.note && <div style={{ fontSize: 13, fontWeight: 800, color: C.rust, marginTop: 6, background: C.rust + "12", borderRadius: 8, padding: "6px 10px" }}>📢 {inst.note}</div>}
                     <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>
                       {enrolled.map(c => <span key={c.id} style={{ background: C.cream, borderRadius: 16, padding: "3px 10px", fontSize: 12, fontWeight: 600, color: C.charcoal }}>{c.name} · 🐕 {c.dogs.map(d => d.name).join(", ")}</span>)}
                       {enrolled.length === 0 && <span style={{ fontSize: 13, color: C.silver }}>No enrollments yet</span>}
