@@ -418,16 +418,10 @@ function Onboarding({ client, onComplete }) {
                   </div>
                   <Input label="Birthday (optional)" type="date" value={dogForm.birthday} onChange={e => setDogForm(f => ({ ...f, birthday: e.target.value }))} />
                   <TextArea label="Behavioral Notes" placeholder="Leash reactive, shy, any health issues..." value={dogForm.notes} onChange={e => setDogForm(f => ({ ...f, notes: e.target.value }))} />
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                    <Field label="Dog Photo">
-                      <input type="file" accept="image/*" ref={photoRef} onChange={e => { const f = e.target.files[0]; if (f) { const r = new FileReader(); r.onload = x => setDogForm(d => ({ ...d, photo: x.target.result })); r.readAsDataURL(f); } }} style={{ display: "none" }} />
-                      <button onClick={() => photoRef.current.click()} style={{ ...inputStyle, cursor: "pointer", textAlign: "left", background: C.white, color: dogForm.photo ? C.sage : C.silver, fontSize: 13 }}>{dogForm.photo ? "✓ Photo added" : "📷 Upload photo"}</button>
-                    </Field>
-                    <Field label="Vaccine Records">
-                      <input type="file" accept=".pdf,.jpg,.png" ref={docRef} onChange={e => { const f = e.target.files[0]; if (f) setDogForm(d => ({ ...d, vaccineDoc: { name: f.name } })); }} style={{ display: "none" }} />
-                      <button onClick={() => docRef.current.click()} style={{ ...inputStyle, cursor: "pointer", textAlign: "left", background: C.white, color: dogForm.vaccineDoc ? C.sage : C.silver, fontSize: 13 }}>{dogForm.vaccineDoc ? `✓ ${dogForm.vaccineDoc.name}` : "📎 Upload records"}</button>
-                    </Field>
-                  </div>
+                  <Field label="Dog Photo (optional)">
+                    <input type="file" accept="image/*" ref={photoRef} onChange={e => { const f = e.target.files[0]; if (f) { const r = new FileReader(); r.onload = x => setDogForm(d => ({ ...d, photo: x.target.result })); r.readAsDataURL(f); } }} style={{ display: "none" }} />
+                    <button onClick={() => photoRef.current.click()} style={{ ...inputStyle, cursor: "pointer", textAlign: "left", background: C.white, color: dogForm.photo ? C.sage : C.silver, fontSize: 13 }}>{dogForm.photo ? "✓ Photo added" : "📷 Upload photo"}</button>
+                  </Field>
                   <Btn variant="sky" onClick={addDog}>+ Add {dogForm.name || "Dog"}</Btn>
                 </div>
               </div>
