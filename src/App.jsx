@@ -11,6 +11,15 @@ const C = {
 
 const GOOGLE_REVIEW_URL = "https://g.page/r/CftsJCiG-FFAEBM/review";
 
+// ─── SESSION TYPES ─────────────────────────────────────────────────────────────
+const SESSION_TYPES = [
+  { value: "initial-facility",  label: "Initial Session — Facility",  location: "facility", kind: "initial",  duration: 90 },
+  { value: "followup-facility", label: "Follow-Up Session — Facility", location: "facility", kind: "followup", duration: 90 },
+  { value: "initial-inhome",    label: "Initial Session — In-Home",    location: "in-home",  kind: "initial",  duration: 90 },
+  { value: "followup-inhome",   label: "Follow-Up Session — In-Home",  location: "in-home",  kind: "followup", duration: 90 },
+];
+const getSessionType = val => SESSION_TYPES.find(s => s.value === val) || SESSION_TYPES[0];
+
 // ─── SEED DATA ────────────────────────────────────────────────────────────────
 const SEED_STAFF = [
   { id: 1, name: "You (Owner)", firstName: "Owner", phone: "555-0001", role: "admin", bio: "Head trainer & owner of Core Canine.", services: ["private", "group"], active: true },
@@ -42,20 +51,20 @@ const SEED_CLIENTS = [
 ];
 
 const SEED_SESSIONS = [
-  { id: 1, clientId: 1, trainerId: 1, date: "2026-03-14", time: "10:00", type: "facility", duration: 60, price: 90, paid: true, notes: "", status: "confirmed" },
-  { id: 2, clientId: 3, trainerId: 2, date: "2026-03-16", time: "14:00", type: "in-home", duration: 60, price: 110, paid: false, notes: "", status: "confirmed" },
-  { id: 3, clientId: 2, trainerId: 1, date: "2026-03-20", time: "11:00", type: "facility", duration: 45, price: 75, paid: true, notes: "", status: "confirmed" },
-  { id: 4, clientId: 4, trainerId: 2, date: "2026-02-28", time: "13:00", type: "facility", duration: 60, price: 90, paid: true, notes: "", status: "completed" },
+  { id: 1, clientId: 1, trainerId: 1, date: "2026-03-14", time: "10:00", sessionType: "initial-facility",  duration: 90, price: 150, paid: true,  notes: "", status: "confirmed" },
+  { id: 2, clientId: 3, trainerId: 2, date: "2026-03-16", time: "14:00", sessionType: "initial-inhome",    duration: 90, price: 175, paid: false, notes: "", status: "confirmed" },
+  { id: 3, clientId: 2, trainerId: 1, date: "2026-03-20", time: "11:00", sessionType: "followup-facility", duration: 90, price: 120, paid: true,  notes: "", status: "confirmed" },
+  { id: 4, clientId: 4, trainerId: 2, date: "2026-02-28", time: "13:00", sessionType: "followup-inhome",   duration: 90, price: 145, paid: true,  notes: "", status: "completed" },
 ];
 
 const SEED_HOMEWORK = [
-  { id: 1, title: "Leave It", category: "Foundation", content: "Hold a treat in your closed fist. Wait for your dog to stop sniffing/pawing and pull away. The moment they disengage, say 'Yes!' and reward from your OTHER hand. Practice 5 reps, 2x daily." },
-  { id: 2, title: "Down", category: "Foundation", content: "Lure your dog's nose down to the floor with a treat. As they fold into a down, say 'Down' and reward on the floor. Keep sessions short — 5 reps max. Release with 'Free!' before the next rep." },
-  { id: 3, title: "Place", category: "Duration", content: "Lead your dog onto their place (bed/mat). Say 'Place' as all 4 paws land. Build duration by counting 5 seconds, then 10, then 15 before releasing. Never release from a broken stay." },
-  { id: 4, title: "Loose Leash Walking", category: "Leash Skills", content: "Start with your dog sitting at your left side. Walk forward — the moment the leash tightens, STOP. Wait for slack, then continue. Reward frequently when the leash is loose. Aim for 20 steps loose before taking a break." },
-  { id: 5, title: "Sit-Stay", category: "Duration", content: "Ask for a sit. Say 'Stay' with a flat palm signal. Take one step back, return, and reward. Gradually build: 2 steps, 5 steps, 10 steps. Always return to your dog to reward — don't call them out of a stay yet." },
-  { id: 6, title: "Recall (Come)", category: "Foundation", content: "Only call your dog when you're sure they'll succeed. Crouch down, open arms, excited voice: 'Come!' Huge reward — this should be the BEST thing that ever happens. Never call to scold or for something unpleasant." },
-  { id: 7, title: "Crate Training", category: "Management", content: "Feed all meals in the crate with door open. Toss treats in randomly throughout the day. Build to closing the door for 10 seconds, then 30, then 1 minute. Never let your dog out while crying — wait for 3 seconds of quiet." },
+  { id: 1, title: "Leave It", category: "Foundation", content: "Hold a treat in your closed fist. Wait for your dog to stop sniffing/pawing and pull away. The moment they disengage, say 'Yes!' and reward from your OTHER hand. Practice 5 reps, 2x daily.", videoUrl: "" },
+  { id: 2, title: "Down", category: "Foundation", content: "Lure your dog's nose down to the floor with a treat. As they fold into a down, say 'Down' and reward on the floor. Keep sessions short — 5 reps max. Release with 'Free!' before the next rep.", videoUrl: "" },
+  { id: 3, title: "Place", category: "Duration", content: "Lead your dog onto their place (bed/mat). Say 'Place' as all 4 paws land. Build duration by counting 5 seconds, then 10, then 15 before releasing. Never release from a broken stay.", videoUrl: "" },
+  { id: 4, title: "Loose Leash Walking", category: "Leash Skills", content: "Start with your dog sitting at your left side. Walk forward — the moment the leash tightens, STOP. Wait for slack, then continue. Reward frequently when the leash is loose. Aim for 20 steps loose before taking a break.", videoUrl: "" },
+  { id: 5, title: "Sit-Stay", category: "Duration", content: "Ask for a sit. Say 'Stay' with a flat palm signal. Take one step back, return, and reward. Gradually build: 2 steps, 5 steps, 10 steps. Always return to your dog to reward — don't call them out of a stay yet.", videoUrl: "" },
+  { id: 6, title: "Recall (Come)", category: "Foundation", content: "Only call your dog when you're sure they'll succeed. Crouch down, open arms, excited voice: 'Come!' Huge reward — this should be the BEST thing that ever happens. Never call to scold or for something unpleasant.", videoUrl: "" },
+  { id: 7, title: "Crate Training", category: "Management", content: "Feed all meals in the crate with door open. Toss treats in randomly throughout the day. Build to closing the door for 10 seconds, then 30, then 1 minute. Never let your dog out while crying — wait for 3 seconds of quiet.", videoUrl: "" },
 ];
 
 const SEED_DISCOUNT_CODES = [
@@ -200,10 +209,9 @@ const CLIENT_NAV = [
 ];
 
 // ─── UNIFIED LOGIN ────────────────────────────────────────────────────────────
-// Identifies who is logging in: staff vs existing client vs new client
-function UnifiedLogin({ onStaffLogin, onClientLogin, staff, clients }) {
+function UnifiedLogin({ onStaffLogin, onClientLogin, staff, clients, settings }) {
   const [mode, setMode] = useState("client"); // "client" | "staff"
-  const [signupMode, setSignupMode] = useState("login"); // "login" | "signup"
+  const [signupMode, setSignupMode] = useState("signup"); // default New Client on left
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [step, setStep] = useState("phone");
@@ -243,7 +251,9 @@ function UnifiedLogin({ onStaffLogin, onClientLogin, staff, clients }) {
   return (
     <div style={{ minHeight: "100vh", background: C.obsidian, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, flexDirection: "column", gap: 20 }}>
       <div style={{ textAlign: "center" }}>
-        <div style={{ fontSize: 52, marginBottom: 10 }}>🐾</div>
+        {settings?.logoUrl
+          ? <img src={settings.logoUrl} alt="Core Canine" style={{ maxHeight: 100, maxWidth: 260, objectFit: "contain", marginBottom: 10 }} />
+          : <div style={{ fontSize: 52, marginBottom: 10 }}>🐾</div>}
         <h1 style={{ fontFamily: "Georgia, serif", color: C.cream, margin: "0 0 6px", fontSize: 30 }}>Core Canine</h1>
         <p style={{ color: C.silver, margin: 0, fontSize: 15 }}>Professional Dog Training</p>
       </div>
@@ -256,10 +266,10 @@ function UnifiedLogin({ onStaffLogin, onClientLogin, staff, clients }) {
           ))}
         </div>
 
-        {/* Client: sign in vs new */}
+        {/* Client: New Client (left) | Sign In (right) */}
         {mode === "client" && (
           <div style={{ display: "flex", gap: 0, marginBottom: 20, background: C.cream, borderRadius: 10, padding: 4 }}>
-            {[["login", "Sign In"], ["signup", "New Client"]].map(([m, l]) => (
+            {[["signup", "New Client"], ["login", "Sign In"]].map(([m, l]) => (
               <button key={m} onClick={() => { setSignupMode(m); setStep("phone"); setError(""); setCode(""); }} style={{ flex: 1, padding: "8px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "inherit", background: signupMode === m ? C.gold : "transparent", color: signupMode === m ? C.obsidian : C.silver, transition: "all 0.15s" }}>{l}</button>
             ))}
           </div>
@@ -1249,15 +1259,17 @@ function Sessions({ currentUser, staff, clients, sessions, setSessions, schedule
   const getAvailTimes = () => {
     if (!form.date || !form.trainerId) return TIMES_24;
     const d = new Date(form.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long" });
-    const key = form.type === "facility" ? "facility" : "inHome";
+    const st = getSessionType(form.sessionType);
+    const key = st.location === "facility" ? "facility" : "inHome";
     const recurring = schedule[form.trainerId]?.[key]?.[d] || [];
-    const oneOffs = oneOffSlots.filter(s => s.trainerId === parseInt(form.trainerId) && s.date === form.date && s.type === form.type).map(s => s.time);
+    const oneOffs = oneOffSlots.filter(s => s.trainerId === parseInt(form.trainerId) && s.date === form.date).map(s => s.time);
     return [...new Set([...recurring, ...oneOffs])].sort();
   };
 
   const save = () => {
     if (!form.clientId || !form.date || !form.time) return;
-    const entry = { ...form, clientId: parseInt(form.clientId), trainerId: parseInt(form.trainerId), price: parseFloat(form.price), duration: parseInt(form.duration), status: "confirmed" };
+    const st = getSessionType(form.sessionType);
+    const entry = { ...form, clientId: parseInt(form.clientId), trainerId: parseInt(form.trainerId), price: parseFloat(form.price), duration: parseInt(form.duration) || st.duration, status: "confirmed" };
     if (editItem) setSessions(ss => ss.map(s => s.id === editItem.id ? { ...entry, id: editItem.id } : s));
     else setSessions(ss => [...ss, { ...entry, id: Date.now() }]);
     setShowModal(false);
@@ -1269,7 +1281,7 @@ function Sessions({ currentUser, staff, clients, sessions, setSessions, schedule
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <h1 style={{ fontFamily: "Georgia, serif", fontSize: 26, color: C.obsidian, margin: 0 }}>Private Sessions</h1>
-        <Btn onClick={() => { setEditItem(null); setForm({ clientId: "", trainerId: String(currentUser.id), date: "", time: "", type: "facility", duration: 60, price: 90, notes: "", paid: false }); setShowModal(true); }}>+ Book Session</Btn>
+        <Btn onClick={() => { setEditItem(null); setForm({ clientId: "", trainerId: String(currentUser.id), date: "", time: "", sessionType: "initial-facility", duration: 90, price: "", notes: "", paid: false }); setShowModal(true); }}>+ Book Session</Btn>
       </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
         {["upcoming", "past", "unpaid", "cancelled", "all"].map(f => (
@@ -1280,13 +1292,14 @@ function Sessions({ currentUser, staff, clients, sessions, setSessions, schedule
         {filtered.map(s => {
           const client = clients.find(c => c.id === s.clientId);
           const trainer = staff.find(t => t.id === s.trainerId);
+          const st = getSessionType(s.sessionType);
           return (
-            <Card key={s.id} style={{ borderLeft: `4px solid ${s.status === "cancelled" ? C.silver : s.type === "facility" ? C.sage : C.gold}` }}>
+            <Card key={s.id} style={{ borderLeft: `4px solid ${s.status === "cancelled" ? C.silver : st.location === "facility" ? C.sage : C.gold}` }}>
               <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 4 }}>
                     <span style={{ fontWeight: 800, fontSize: 15, color: C.obsidian }}>{client?.name}</span>
-                    <Pill color={s.type === "facility" ? C.sage : C.gold}>{s.type === "facility" ? "🏠 Facility" : "🚗 In-Home"}</Pill>
+                    <Pill color={st.location === "facility" ? C.sage : C.gold}>{st.label}</Pill>
                     <Pill color={s.paid ? C.sage : C.rust}>{s.paid ? "Paid" : "Unpaid"}</Pill>
                     {s.status === "cancelled" && <Pill color={C.silver}>Cancelled</Pill>}
                     {s.status === "completed" && <Pill color={C.sky}>Completed</Pill>}
@@ -1326,18 +1339,18 @@ function Sessions({ currentUser, staff, clients, sessions, setSessions, schedule
                 {availTrainers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </Sel>
             )}
-            <Sel label="Session Type" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value, time: "" }))}>
-              <option value="facility">🏠 At Facility</option>
-              <option value="in-home">🚗 In-Home</option>
+            <Sel label="Session Type" value={form.sessionType} onChange={e => setForm(f => ({ ...f, sessionType: e.target.value, time: "", duration: getSessionType(e.target.value).duration, price: "" }))}>
+              {SESSION_TYPES.map(st => <option key={st.value} value={st.value}>{st.label}</option>)}
             </Sel>
             <Input label="Date" type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value, time: "" }))} />
-            <Sel label="Available Time" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))}>
+            <Sel label="Available Time (from trainer schedule)" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))}>
               <option value="">Select time…</option>
               {getAvailTimes().map(t => <option key={t} value={t}>{fmt12(t)}</option>)}
             </Sel>
+            <Input label="Custom time override" type="time" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} hint="You can type any time — not limited to schedule slots" />
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <Input label="Duration (min)" type="number" value={form.duration} onChange={e => setForm(f => ({ ...f, duration: e.target.value }))} />
-              <Input label="Price ($)" type="number" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} />
+              <Input label="Price ($)" type="number" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} hint="Leave blank or 0 for complimentary" />
             </div>
             <TextArea label="Session Notes (trainer-only)" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
             <label style={{ display: "flex", gap: 8, alignItems: "center", cursor: "pointer", fontSize: 14, color: C.obsidian }}>
@@ -1783,12 +1796,24 @@ function StaffMessages({ currentUser, clients, messages, setMessages, staff }) {
 function HomeworkCards({ currentUser, homeworkCards, setHomeworkCards, clients, sessions }) {
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState(null);
-  const [form, setForm] = useState({ title: "", category: "", content: "" });
+  const [form, setForm] = useState({ title: "", category: "", content: "", videoUrl: "" });
   const [sendMode, setSendMode] = useState(false);
   const [selected, setSelected] = useState([]);
   const [sendTo, setSendTo] = useState("");
+  const [clientSearch, setClientSearch] = useState("");
   const categories = [...new Set(homeworkCards.map(h => h.category))];
   const myClients = currentUser.role === "admin" ? clients : clients.filter(c => sessions.some(s => s.clientId === c.id && s.trainerId === currentUser.id));
+  const filteredClients = myClients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase()) || c.dogs?.some(d => d.name.toLowerCase().includes(clientSearch.toLowerCase())));
+
+  // Parse YouTube/Vimeo URLs into embeddable format
+  const getEmbedUrl = url => {
+    if (!url) return null;
+    const ytMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([^&?/]+)/);
+    if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}`;
+    const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
+    if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+    return null;
+  };
 
   const save = () => {
     if (!form.title || !form.content) return;
@@ -1799,8 +1824,9 @@ function HomeworkCards({ currentUser, homeworkCards, setHomeworkCards, clients, 
 
   const sendHomework = () => {
     if (!sendTo || selected.length === 0) return;
-    setSendMode(false); setSelected([]); setSendTo("");
-    alert(`✓ Homework sent! Cards: ${selected.map(id => homeworkCards.find(h => h.id === id)?.title).join(", ")}`);
+    const client = myClients.find(c => String(c.id) === sendTo);
+    setSendMode(false); setSelected([]); setSendTo(""); setClientSearch("");
+    alert(`✓ Homework sent to ${client?.name}!\nCards: ${selected.map(id => homeworkCards.find(h => h.id === id)?.title).join(", ")}`);
   };
 
   return (
@@ -1809,33 +1835,61 @@ function HomeworkCards({ currentUser, homeworkCards, setHomeworkCards, clients, 
         <h1 style={{ fontFamily: "Georgia, serif", fontSize: 26, color: C.obsidian, margin: 0 }}>Homework Cards</h1>
         <div style={{ display: "flex", gap: 8 }}>
           <Btn variant="sage" onClick={() => setSendMode(true)}>📱 Send to Client</Btn>
-          <Btn onClick={() => { setEditItem(null); setForm({ title: "", category: "", content: "" }); setShowModal(true); }}>+ New Card</Btn>
+          <Btn onClick={() => { setEditItem(null); setForm({ title: "", category: "", content: "", videoUrl: "" }); setShowModal(true); }}>+ New Card</Btn>
         </div>
       </div>
       {categories.map(cat => (
         <div key={cat} style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: C.silver, textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>{cat}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
-            {homeworkCards.filter(h => h.category === cat).map(card => (
-              <Card key={card.id} style={{ borderTop: `3px solid ${C.gold}` }}>
-                <div style={{ fontWeight: 800, fontSize: 14, color: C.obsidian, marginBottom: 6 }}>{card.title}</div>
-                <div style={{ fontSize: 13, color: C.steel, lineHeight: 1.6 }}>{card.content}</div>
-                <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
-                  <Btn small variant="ghost" onClick={() => { setEditItem(card); setForm({ ...card }); setShowModal(true); }}>Edit</Btn>
-                  <Btn small variant="danger" onClick={() => setHomeworkCards(hs => hs.filter(h => h.id !== card.id))}>✕</Btn>
-                </div>
-              </Card>
-            ))}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
+            {homeworkCards.filter(h => h.category === cat).map(card => {
+              const embedUrl = getEmbedUrl(card.videoUrl);
+              return (
+                <Card key={card.id} style={{ borderTop: `3px solid ${C.gold}` }}>
+                  <div style={{ fontWeight: 800, fontSize: 14, color: C.obsidian, marginBottom: 6 }}>{card.title}</div>
+                  <div style={{ fontSize: 13, color: C.steel, lineHeight: 1.6 }}>{card.content}</div>
+                  {embedUrl && (
+                    <div style={{ marginTop: 10, borderRadius: 8, overflow: "hidden", background: "#000" }}>
+                      <iframe src={embedUrl} style={{ width: "100%", height: 150, border: "none", display: "block" }} allowFullScreen title={card.title} />
+                    </div>
+                  )}
+                  {card.videoUrl && !embedUrl && (
+                    <a href={card.videoUrl} target="_blank" rel="noreferrer" style={{ display: "inline-block", marginTop: 8, fontSize: 12, color: C.sky, textDecoration: "none" }}>▶ Watch Video</a>
+                  )}
+                  <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
+                    <Btn small variant="ghost" onClick={() => { setEditItem(card); setForm({ title: card.title, category: card.category, content: card.content, videoUrl: card.videoUrl || "" }); setShowModal(true); }}>Edit</Btn>
+                    <Btn small variant="danger" onClick={() => setHomeworkCards(hs => hs.filter(h => h.id !== card.id))}>✕</Btn>
+                  </div>
+                </Card>
+              );
+            })}
           </div>
         </div>
       ))}
+
       {sendMode && (
-        <Modal title="Send Homework to Client" onClose={() => { setSendMode(false); setSelected([]); }} wide>
+        <Modal title="Send Homework to Client" onClose={() => { setSendMode(false); setSelected([]); setClientSearch(""); setSendTo(""); }} wide>
           <div style={{ display: "grid", gap: 16 }}>
-            <Sel label="Select Client" value={sendTo} onChange={e => setSendTo(e.target.value)}>
-              <option value="">Choose a client…</option>
-              {myClients.map(c => <option key={c.id} value={c.id}>{c.name} — 🐕 {c.dogs.map(d => d.name).join(", ")}</option>)}
-            </Sel>
+            <Field label="Search for Client">
+              <input
+                style={inputStyle}
+                placeholder="Type client or dog name…"
+                value={clientSearch}
+                onChange={e => { setClientSearch(e.target.value); setSendTo(""); }}
+              />
+              {clientSearch.length > 0 && (
+                <div style={{ background: C.white, border: `1.5px solid ${C.fog}`, borderRadius: 9, marginTop: 4, maxHeight: 180, overflowY: "auto", boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
+                  {filteredClients.length === 0
+                    ? <div style={{ padding: "10px 14px", color: C.silver, fontSize: 13 }}>No clients found</div>
+                    : filteredClients.map(c => (
+                      <div key={c.id} onClick={() => { setSendTo(String(c.id)); setClientSearch(c.name); }} style={{ padding: "10px 14px", cursor: "pointer", fontSize: 14, fontWeight: sendTo === String(c.id) ? 800 : 400, color: C.obsidian, background: sendTo === String(c.id) ? C.cream : "transparent", borderBottom: `1px solid ${C.fog}` }}>
+                        {c.name} — 🐕 {c.dogs.map(d => d.name).join(", ")}
+                      </div>
+                    ))}
+                </div>
+              )}
+              {sendTo && <div style={{ fontSize: 12, color: C.sage, marginTop: 4 }}>✓ {myClients.find(c => String(c.id) === sendTo)?.name} selected</div>}
+            </Field>
             <div>
               <div style={{ fontSize: 11, fontWeight: 800, color: C.steel, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 10 }}>Select Cards to Send</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8 }}>
@@ -1851,18 +1905,31 @@ function HomeworkCards({ currentUser, homeworkCards, setHomeworkCards, clients, 
               </div>
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <Btn variant="ghost" onClick={() => { setSendMode(false); setSelected([]); }}>Cancel</Btn>
+              <Btn variant="ghost" onClick={() => { setSendMode(false); setSelected([]); setClientSearch(""); setSendTo(""); }}>Cancel</Btn>
               <Btn variant="sage" disabled={!sendTo || selected.length === 0} onClick={sendHomework}>📱 Send {selected.length > 0 ? `(${selected.length} cards)` : ""}</Btn>
             </div>
           </div>
         </Modal>
       )}
+
       {showModal && (
         <Modal title={editItem ? "Edit Homework Card" : "New Homework Card"} onClose={() => setShowModal(false)}>
           <div style={{ display: "grid", gap: 14 }}>
             <Input label="Card Title" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
-            <Input label="Category" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} />
+            <Input label="Category" placeholder="Foundation, Duration, Leash Skills…" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} />
             <TextArea label="Instructions / Homework Content" value={form.content} onChange={e => setForm(f => ({ ...f, content: e.target.value }))} style={{ minHeight: 120 }} />
+            <Input
+              label="Video URL (optional)"
+              hint="Paste a YouTube or Vimeo link — it will embed automatically"
+              placeholder="https://youtube.com/watch?v=..."
+              value={form.videoUrl}
+              onChange={e => setForm(f => ({ ...f, videoUrl: e.target.value }))}
+            />
+            {getEmbedUrl(form.videoUrl) && (
+              <div style={{ borderRadius: 8, overflow: "hidden", background: "#000" }}>
+                <iframe src={getEmbedUrl(form.videoUrl)} style={{ width: "100%", height: 160, border: "none", display: "block" }} allowFullScreen title="Preview" />
+              </div>
+            )}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <Btn variant="ghost" onClick={() => setShowModal(false)}>Cancel</Btn>
               <Btn onClick={save}>Save Card</Btn>
@@ -2031,6 +2098,8 @@ function DiscountsAndGiftCards({ discountCodes, setDiscountCodes, giftCards, set
 
 function Reports({ sessions, clients, staff, refunds }) {
   const [period, setPeriod] = useState("all");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
   const CC_RATE = 0.029; const CC_FIXED = 0.30;
 
   const filterByPeriod = (items, f = "date") => {
@@ -2040,6 +2109,12 @@ function Reports({ sessions, clients, staff, refunds }) {
       if (period === "thisMonth") return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
       if (period === "lastMonth") { const lm = new Date(now.getFullYear(), now.getMonth() - 1); return d.getMonth() === lm.getMonth() && d.getFullYear() === lm.getFullYear(); }
       if (period === "thisYear") return d.getFullYear() === now.getFullYear();
+      if (period === "lastYear") return d.getFullYear() === now.getFullYear() - 1;
+      if (period === "custom") {
+        if (customStart && d < new Date(customStart + "T00:00:00")) return false;
+        if (customEnd && d > new Date(customEnd + "T23:59:59")) return false;
+        return true;
+      }
       return true;
     });
   };
@@ -2066,11 +2141,21 @@ function Reports({ sessions, clients, staff, refunds }) {
   return (
     <div>
       <h1 style={{ fontFamily: "Georgia, serif", fontSize: 26, color: C.obsidian, marginBottom: 20 }}>Reports</h1>
-      <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" }}>
-        {[["all", "All Time"], ["thisMonth", "This Month"], ["lastMonth", "Last Month"], ["thisYear", "This Year"]].map(([v, l]) => (
+      <div style={{ display: "flex", gap: 6, marginBottom: period === "custom" ? 12 : 20, flexWrap: "wrap" }}>
+        {[["all", "All Time"], ["thisMonth", "This Month"], ["lastMonth", "Last Month"], ["thisYear", "This Year"], ["lastYear", "Last Year"], ["custom", "Custom Range"]].map(([v, l]) => (
           <button key={v} onClick={() => setPeriod(v)} style={{ padding: "6px 14px", borderRadius: 20, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 12, background: period === v ? C.obsidian : C.fog, color: period === v ? C.cream : C.charcoal }}>{l}</button>
         ))}
       </div>
+      {period === "custom" && (
+        <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 20, flexWrap: "wrap" }}>
+          <Field label="From">
+            <input type="date" style={inputStyle} value={customStart} onChange={e => setCustomStart(e.target.value)} />
+          </Field>
+          <Field label="To">
+            <input type="date" style={inputStyle} value={customEnd} onChange={e => setCustomEnd(e.target.value)} />
+          </Field>
+        </div>
+      )}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, marginBottom: 28 }}>
         {[["Gross Revenue", `$${totalRevenue.toFixed(2)}`, C.sage], ["Processing Fees", `$${totalFees.toFixed(2)}`, C.rust], ["Refunds Issued", `$${totalRefunds.toFixed(2)}`, C.rust], ["Net Revenue", `$${netRevenue.toFixed(2)}`, C.gold], ["Sessions (paid)", paidSessions.length, C.sky]].map(([l, v, c]) => (
           <Card key={l} style={{ textAlign: "center", padding: "16px 12px" }}>
@@ -2103,10 +2188,35 @@ function Reports({ sessions, clients, staff, refunds }) {
 }
 
 function SettingsPage({ settings, setSettings }) {
+  const logoRef = useRef();
+  const handleLogoUpload = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => setSettings(s => ({ ...s, logoUrl: ev.target.result }));
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div>
       <h1 style={{ fontFamily: "Georgia, serif", fontSize: 26, color: C.obsidian, marginBottom: 20 }}>Settings</h1>
       <div style={{ display: "grid", gap: 20, maxWidth: 600 }}>
+
+        <Card>
+          <h3 style={{ fontFamily: "Georgia, serif", marginTop: 0 }}>Business Logo</h3>
+          <p style={{ color: C.silver, fontSize: 13, margin: "0 0 14px" }}>Shown on the client login screen. PNG or JPG recommended.</p>
+          <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+            {settings.logoUrl
+              ? <img src={settings.logoUrl} alt="Logo" style={{ maxHeight: 70, maxWidth: 180, objectFit: "contain", borderRadius: 8, border: `1px solid ${C.fog}`, padding: 6, background: C.obsidian }} />
+              : <div style={{ width: 100, height: 70, background: C.fog, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>🐾</div>}
+            <div style={{ display: "flex", gap: 8 }}>
+              <input type="file" accept="image/*" ref={logoRef} onChange={handleLogoUpload} style={{ display: "none" }} />
+              <Btn variant="ghost" small onClick={() => logoRef.current.click()}>Upload Logo</Btn>
+              {settings.logoUrl && <Btn variant="danger" small onClick={() => setSettings(s => ({ ...s, logoUrl: "" }))}>Remove</Btn>}
+            </div>
+          </div>
+        </Card>
+
         <Card>
           <h3 style={{ fontFamily: "Georgia, serif", marginTop: 0 }}>Business Info</h3>
           <div style={{ display: "grid", gap: 14 }}>
@@ -2116,6 +2226,18 @@ function SettingsPage({ settings, setSettings }) {
             <Input label="Address" value={settings.address} onChange={e => setSettings(s => ({ ...s, address: e.target.value }))} />
           </div>
         </Card>
+
+        <Card>
+          <h3 style={{ fontFamily: "Georgia, serif", marginTop: 0 }}>Session Pricing</h3>
+          <p style={{ color: C.silver, fontSize: 13, margin: "0 0 14px" }}>All private sessions are 90 minutes with a 30-minute buffer.</p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <Input label="Initial — Facility ($)" type="number" value={settings.priceInitialFacility || ""} placeholder="150" onChange={e => setSettings(s => ({ ...s, priceInitialFacility: e.target.value }))} />
+            <Input label="Follow-Up — Facility ($)" type="number" value={settings.priceFollowupFacility || ""} placeholder="120" onChange={e => setSettings(s => ({ ...s, priceFollowupFacility: e.target.value }))} />
+            <Input label="Initial — In-Home ($)" type="number" value={settings.priceInitialInHome || ""} placeholder="175" onChange={e => setSettings(s => ({ ...s, priceInitialInHome: e.target.value }))} />
+            <Input label="Follow-Up — In-Home ($)" type="number" value={settings.priceFollowupInHome || ""} placeholder="145" onChange={e => setSettings(s => ({ ...s, priceFollowupInHome: e.target.value }))} />
+          </div>
+        </Card>
+
         <Card>
           <h3 style={{ fontFamily: "Georgia, serif", marginTop: 0 }}>Reminders</h3>
           <div style={{ display: "grid", gap: 14 }}>
@@ -2126,17 +2248,22 @@ function SettingsPage({ settings, setSettings }) {
             </label>
           </div>
         </Card>
+
         <Card>
           <h3 style={{ fontFamily: "Georgia, serif", marginTop: 0 }}>Cancellation Policy</h3>
           <TextArea label="Policy text (shown to clients at booking)" value={settings.cancellationPolicy} onChange={e => setSettings(s => ({ ...s, cancellationPolicy: e.target.value }))} />
         </Card>
+
         <Card>
           <h3 style={{ fontFamily: "Georgia, serif", marginTop: 0 }}>Liability Waiver</h3>
           <TextArea label="Waiver text" value={settings.waiver} onChange={e => setSettings(s => ({ ...s, waiver: e.target.value }))} style={{ minHeight: 160 }} />
         </Card>
+
         <Card>
           <h3 style={{ fontFamily: "Georgia, serif", marginTop: 0 }}>Integrations</h3>
           <div style={{ display: "grid", gap: 14 }}>
+            <Input label="Business Email (from address for all emails)" value={settings.businessEmail || ""} placeholder="april@corecanine.com" onChange={e => setSettings(s => ({ ...s, businessEmail: e.target.value }))} />
+            <Input label="SendGrid API Key" value={settings.sendgridKey || ""} onChange={e => setSettings(s => ({ ...s, sendgridKey: e.target.value }))} type="password" placeholder="SG.xxxxxxxx (set up later)" hint="Get this from SendGrid once your account is ready" />
             <Input label="Twilio Account SID" value={settings.twilioSid} onChange={e => setSettings(s => ({ ...s, twilioSid: e.target.value }))} placeholder="ACxxxxxxxxxxxxxxxx" />
             <Input label="Twilio Auth Token" value={settings.twilioToken} onChange={e => setSettings(s => ({ ...s, twilioToken: e.target.value }))} type="password" placeholder="••••••••" />
             <Input label="Twilio Phone Number" value={settings.twilioPhone} onChange={e => setSettings(s => ({ ...s, twilioPhone: e.target.value }))} placeholder="+15551234567" />
@@ -2144,6 +2271,7 @@ function SettingsPage({ settings, setSettings }) {
             <Input label="Google Review URL" value={settings.googleReviewUrl} onChange={e => setSettings(s => ({ ...s, googleReviewUrl: e.target.value }))} />
           </div>
         </Card>
+
       </div>
     </div>
   );
@@ -2223,6 +2351,10 @@ export default function App() {
   const [refunds] = useState(SEED_REFUNDS);
   const [settings, setSettings] = useState({
     businessName: "Core Canine", phone: "555-CORE", email: "hello@corecanine.com", address: "123 Training Ln",
+    logoUrl: "",
+    priceInitialFacility: 150, priceFollowupFacility: 120,
+    priceInitialInHome: 175, priceFollowupInHome: 145,
+    businessEmail: "april@corecanine.com", sendgridKey: "",
     reminderHours: "24", autoReviewRequest: true,
     cancellationPolicy: "Cancellations made more than 72 hours before your session may be rescheduled. Cancellations within 72 hours are non-refundable.",
     waiver: "I understand that dog training involves inherent risks. I agree that Core Canine and its trainers are not liable for any injury or damage arising from training sessions. I confirm that my dog is up-to-date on all required vaccinations.",
@@ -2248,7 +2380,7 @@ export default function App() {
 
   // Not logged in
   if (!currentUser) {
-    return <UnifiedLogin onStaffLogin={handleStaffLogin} onClientLogin={handleClientLogin} staff={staff} clients={clients} />;
+    return <UnifiedLogin onStaffLogin={handleStaffLogin} onClientLogin={handleClientLogin} staff={staff} clients={clients} settings={settings} />;
   }
 
   // New client needs onboarding
