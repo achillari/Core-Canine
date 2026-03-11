@@ -2089,7 +2089,7 @@ function Classes({ currentUser, staff, clients, classTemplates, setClassTemplate
   const [editInst, setEditInst] = useState(null);
   const [rosterInst, setRosterInst] = useState(null);
   const [tmplForm, setTmplForm] = useState({ name: "", weeks: 4, maxDogs: 6, price: 150, description: "", waitlistEnabled: false, freeClass: false });
-  const [instForm, setInstForm] = useState({ templateId: "", instructorId: String(currentUser.id), startDate: "", time: "", note: "", skipDates: [] });
+  const [instForm, setInstForm] = useState({ templateId: "", instructorId: String(currentUser.id), startDate: "", time: "", duration: 60, note: "", skipDates: [] });
 
   const saveTmpl = () => {
     if (!tmplForm.name) return;
@@ -2166,7 +2166,7 @@ function Classes({ currentUser, staff, clients, classTemplates, setClassTemplate
         <h1 style={{ fontFamily: "Georgia, serif", fontSize: 26, color: C.obsidian, margin: 0 }}>Group Classes</h1>
         <div style={{ display: "flex", gap: 8 }}>
           {currentUser.role === "admin" && <Btn variant="ghost" onClick={() => { setEditTmpl(null); setTmplForm({ name: "", weeks: 4, maxDogs: 6, price: 150, description: "", waitlistEnabled: false, freeClass: false }); setShowTmplModal(true); }}>+ Class Template</Btn>}
-          {currentUser.role === "admin" && <Btn onClick={() => { setEditInst(null); setInstForm({ templateId: "", instructorId: String(currentUser.id), startDate: "", time: "", note: "", skipDates: [] }); setShowInstModal(true); }}>+ Schedule Class</Btn>}
+          {currentUser.role === "admin" && <Btn onClick={() => { setEditInst(null); setInstForm({ templateId: "", instructorId: String(currentUser.id), startDate: "", time: "", duration: 60, note: "", skipDates: [] }); setShowInstModal(true); }}>+ Schedule Class</Btn>}
         </div>
       </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
@@ -2218,7 +2218,7 @@ function Classes({ currentUser, staff, clients, classTemplates, setClassTemplate
                       {inst.meetingDates?.length > 0
                         ? <>{fmtDate(inst.meetingDates[0])} → {fmtDate(inst.meetingDates[inst.meetingDates.length - 1])}</>
                         : <>{fmtDate(inst.startDate)} → {fmtDate(addWeeks(inst.startDate, (tmpl?.weeks || 1) - 1))}</>
-                      } · {fmt12(inst.time)} · {tmpl?.weeks} sessions
+                      } · {fmt12(inst.time)} · {inst.duration || 60} min · {tmpl?.weeks} sessions
                       {inst.skipDates?.length > 0 && <span style={{ color: C.rust, marginLeft: 6 }}>· Skipping {inst.skipDates.map(d => fmtDateShort(d)).join(", ")}</span>}
                     </div>
                     <div style={{ fontSize: 13, color: C.gold, marginTop: 2 }}>Instructor: {instructor?.name} · ${tmpl?.price}/enrollment</div>
@@ -2230,7 +2230,7 @@ function Classes({ currentUser, staff, clients, classTemplates, setClassTemplate
                   </div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <Btn small variant="sage" onClick={() => setRosterInst(inst)}>👥 Roster</Btn>
-                    <Btn small variant="ghost" onClick={() => { setEditInst(inst); setInstForm({ templateId: String(inst.templateId), instructorId: String(inst.instructorId), startDate: inst.startDate, time: inst.time, note: inst.note || "", skipDates: inst.skipDates || [] }); setShowInstModal(true); }}>✏️ Edit</Btn>
+                    <Btn small variant="ghost" onClick={() => { setEditInst(inst); setInstForm({ templateId: String(inst.templateId), instructorId: String(inst.instructorId), startDate: inst.startDate, time: inst.time, duration: inst.duration || 60, note: inst.note || "", skipDates: inst.skipDates || [] }); setShowInstModal(true); }}>✏️ Edit</Btn>
                     <Btn small variant="dark" onClick={() => printRoster(inst)}>🖨️ Print</Btn>
                   </div>
                 </div>
@@ -2363,7 +2363,17 @@ function Classes({ currentUser, staff, clients, classTemplates, setClassTemplate
                 </Sel>
               )}
               <Input label="Start Date" type="date" value={instForm.startDate} onChange={e => setInstForm(f => ({ ...f, startDate: e.target.value, skipDates: [] }))} />
-              <Input label="Time" type="time" value={instForm.time} onChange={e => setInstForm(f => ({ ...f, time: e.target.value }))} />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <Input label="Time" type="time" value={instForm.time} onChange={e => setInstForm(f => ({ ...f, time: e.target.value }))} />
+                <Sel label="Duration" value={instForm.duration} onChange={e => setInstForm(f => ({ ...f, duration: parseInt(e.target.value) }))}>
+                  <option value={30}>30 min</option>
+                  <option value={45}>45 min</option>
+                  <option value={60}>60 min</option>
+                  <option value={75}>75 min</option>
+                  <option value={90}>90 min</option>
+                  <option value={120}>2 hours</option>
+                </Sel>
+              </div>
               <TextArea label="Class Note (optional)" value={instForm.note} onChange={e => setInstForm(f => ({ ...f, note: e.target.value }))} hint='e.g. "This class skips 4/1 for spring break and resumes 4/8"' />
               {instForm.templateId && instForm.startDate && instWeeks > 0 && (
                 <div style={{ background: C.cream, borderRadius: 10, padding: "12px 16px" }}>
