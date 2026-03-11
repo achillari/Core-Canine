@@ -489,7 +489,7 @@ function Onboarding({ client, onComplete }) {
 }
 
 // ─── CLIENT PORTAL SCREENS ────────────────────────────────────────────────────
-function BookSession({ client, discountCodes, giftCards, staffList, schedule, onBack, onBooked }) {
+function BookSession({ client, discountCodes, giftCards, staffList, schedule, sessions, onBack, onBooked }) {
   const isReturning = !!(client?.name && client?.email && client?.dogs?.length > 0);
   const [step, setStep] = useState(1);
   const [trainer, setTrainer] = useState(null);
@@ -519,6 +519,17 @@ function BookSession({ client, discountCodes, giftCards, staffList, schedule, on
     return Math.max(0, t);
   };
 
+  const getAvailableTimes = (dateStr) => {
+    if (!trainer || !dateStr) return [];
+    const key = sessionType === "facility" ? "facility" : "inHome";
+    const dayName = new Date(dateStr + "T12:00:00").toLocaleDateString("en-US", { weekday: "long" });
+    const allSlots = schedule[trainer.id]?.[key]?.[dayName] || [];
+    const bookedTimes = (sessions || [])
+      .filter(s => s.trainerId === trainer.id && s.date === dateStr && s.status !== "cancelled")
+      .map(s => s.time);
+    return allSlots.filter(t => !bookedTimes.includes(t));
+  };
+
   const getDates = () => {
     if (!trainer) return [];
     const key = sessionType === "facility" ? "facility" : "inHome";
@@ -526,18 +537,14 @@ function BookSession({ client, discountCodes, giftCards, staffList, schedule, on
     const dates = [];
     for (let i = 1; i <= 35; i++) {
       const d = new Date(); d.setDate(d.getDate() + i);
+      const dateStr = d.toISOString().slice(0, 10);
       const dayName = d.toLocaleDateString("en-US", { weekday: "long" });
-      if (daySlots[dayName]?.length > 0) dates.push(d.toISOString().slice(0, 10));
+      if (daySlots[dayName]?.length > 0 && getAvailableTimes(dateStr).length > 0) dates.push(dateStr);
     }
     return dates.slice(0, 20);
   };
 
-  const getTimes = () => {
-    if (!trainer || !selectedDate) return [];
-    const dayName = new Date(selectedDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "long" });
-    const key = sessionType === "facility" ? "facility" : "inHome";
-    return schedule[trainer.id]?.[key]?.[dayName] || [];
-  };
+  const getTimes = () => getAvailableTimes(selectedDate);
 
   const addIntakeDog = () => setIntake(f => ({ ...f, dogs: [...f.dogs, { id: Date.now(), name: "", breed: "", dob: "", weight: "" }] }));
   const removeIntakeDog = id => setIntake(f => ({ ...f, dogs: f.dogs.filter(d => d.id !== id) }));
@@ -1232,7 +1239,7 @@ function ClientPortal({ client, setClient, onSignOut, staff, sessions, classTemp
     setPage("bookings");
   };
 
-  const sharedProps = { client, discountCodes, giftCards, staffList: staff, schedule, classTemplates, classInstances };
+  const sharedProps = { client, discountCodes, giftCards, staffList: staff, schedule, sessions, classTemplates, classInstances };
 
   return (
     <div style={{ minHeight: "100vh", background: C.cream, fontFamily: "Georgia, serif", paddingBottom: 80 }}>
