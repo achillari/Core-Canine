@@ -1360,12 +1360,103 @@ function Dashboard({ currentUser, staff, clients, sessions, classInstances, clas
 }
 
 // ─── CALENDAR VIEW ────────────────────────────────────────────────────────────
-function CalendarView({ currentUser, staff, clients, sessions, classInstances, classTemplates, blockedDates, setBlockedDates }) {
+// ─── CLIENT DETAIL MODAL (shared by Sessions + CalendarView) ─────────────────
+function ClientDetailModal({ client, sessions, dogNotes, setDogNotes, currentUser, onClose }) {
+  const [activeTab, setActiveTab] = useState("info");
+
+  const addNote = (dogId, text) => {
+    if (!text.trim()) return;
+    setDogNotes(prev => ({ ...prev, [dogId]: [...(prev[dogId] || []), { id: Date.now(), trainerId: currentUser.id, date: today, text }] }));
+  };
+
+  if (!client) return null;
+  return (
+    <Modal title={client.name} onClose={onClose} wide>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ color: C.silver, fontSize: 13 }}>📧 {client.email} · 📞 {client.phone}</div>
+        <div style={{ marginTop: 6, display: "flex", gap: 6 }}>
+          {client.waiverSigned ? <Pill color={C.sage}>✓ Waiver Signed</Pill> : <Pill color={C.rust}>Waiver Pending</Pill>}
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, borderBottom: `1px solid ${C.fog}`, paddingBottom: 12 }}>
+        {["info", "dogs", "notes", "history"].map(t => (
+          <button key={t} onClick={() => setActiveTab(t)} style={{ padding: "7px 16px", borderRadius: 20, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 12, textTransform: "capitalize", background: activeTab === t ? C.obsidian : C.fog, color: activeTab === t ? C.cream : C.charcoal }}>{t}</button>
+        ))}
+      </div>
+      {activeTab === "info" && (
+        <div style={{ display: "grid", gap: 10 }}>
+          {[["Name", client.name], ["Phone", client.phone], ["Email", client.email], ["Joined", fmtDate(client.joinDate)], ["Waiver", client.waiverSigned ? "Signed" : "Not signed"]].map(([l, v]) => (
+            <div key={l}><b style={{ color: C.obsidian }}>{l}:</b> <span style={{ color: C.steel }}>{v}</span></div>
+          ))}
+        </div>
+      )}
+      {activeTab === "dogs" && (
+        <div style={{ display: "grid", gap: 16 }}>
+          {client.dogs?.map(dog => (
+            <div key={dog.id} style={{ background: C.cream, borderRadius: 12, padding: 16 }}>
+              <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 4 }}>🐕 {dog.name}</div>
+              <div style={{ fontSize: 13, color: C.silver }}>{dog.breed} · {dog.age} {dog.ageUnit || "yr"} · {dog.sex} · {dog.neutered ? "Fixed" : "Intact"}</div>
+              {dog.birthday && <div style={{ fontSize: 12, color: C.gold, marginTop: 2 }}>🎂 {fmtDate(dog.birthday)}</div>}
+              {dog.notes && <div style={{ fontSize: 13, color: C.steel, marginTop: 6, fontStyle: "italic", background: C.white, borderRadius: 8, padding: "8px 12px" }}>{dog.notes}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+      {activeTab === "notes" && (
+        <div>
+          <p style={{ fontSize: 13, color: C.silver, marginTop: 0 }}>Trainer-only notes. Clients never see these.</p>
+          {client.dogs?.map(dog => {
+            const notes = dogNotes[dog.id] || [];
+            const [newNote, setNewNote] = useState("");
+            return (
+              <div key={dog.id} style={{ marginBottom: 20 }}>
+                <div style={{ fontWeight: 700, color: C.obsidian, marginBottom: 8 }}>🐕 {dog.name}</div>
+                <div style={{ background: C.cream, borderRadius: 10, padding: 14, minHeight: 60, marginBottom: 10 }}>
+                  {notes.length === 0 && <span style={{ color: C.silver, fontSize: 13 }}>No notes yet.</span>}
+                  {notes.map(n => (
+                    <div key={n.id} style={{ padding: "8px 0", borderBottom: `1px solid ${C.fog}` }}>
+                      <div style={{ fontSize: 11, color: C.silver, marginBottom: 2 }}>{fmtDate(n.date)}</div>
+                      <div style={{ fontSize: 14, color: C.obsidian }}>{n.text}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input style={{ ...inputStyle, flex: 1 }} placeholder="Add a note…" value={newNote} onChange={e => setNewNote(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { addNote(dog.id, newNote); setNewNote(""); } }} />
+                  <Btn small onClick={() => { addNote(dog.id, newNote); setNewNote(""); }}>Add</Btn>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {activeTab === "history" && (
+        <div>
+          {sessions.filter(s => s.clientId === client.id).sort((a, b) => b.date > a.date ? 1 : -1).map(s => (
+            <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: `1px solid ${C.fog}` }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: C.obsidian }}>{fmtDate(s.date)} · {fmt12(s.time)}</div>
+                <div style={{ fontSize: 12, color: C.silver }}>{getSessionType(s.sessionType)?.label || s.sessionType} · {s.duration} min · ${s.price}</div>
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <Pill color={s.paid ? C.sage : C.rust}>{s.paid ? "Paid" : "Unpaid"}</Pill>
+                {s.status === "completed" && <Pill color={C.sky}>Done</Pill>}
+              </div>
+            </div>
+          ))}
+          {sessions.filter(s => s.clientId === client.id).length === 0 && <p style={{ color: C.silver, fontSize: 13 }}>No session history.</p>}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+function CalendarView({ currentUser, staff, clients, sessions, classInstances, classTemplates, blockedDates, setBlockedDates, dogNotes, setDogNotes }) {
   const [view, setView] = useState("week");
   const [anchor, setAnchor] = useState(today); // "YYYY-MM-DD" reference date
   const [showBlockModal, setShowBlockModal] = useState(false);
   const [blockForm, setBlockForm] = useState({ startDate: "", endDate: "", reason: "" });
   const [showIcalModal, setShowIcalModal] = useState(false);
+  const [selectedClient, setSelectedClient] = useState(null);
 
   const isAdmin = currentUser.role === "admin";
 
@@ -1418,7 +1509,8 @@ function CalendarView({ currentUser, staff, clients, sessions, classInstances, c
       events.push({
         key: `s-${s.id}`, time: s.time, label: client?.name || "Session",
         sub: isAdmin ? `${trainer?.firstName || trainer?.name} · ${st.label}` : st.label,
-        color: st.location === "facility" ? C.sage : C.gold, kind: "session"
+        color: st.location === "facility" ? C.sage : C.gold, kind: "session",
+        clientId: s.clientId
       });
     });
     classInstances.filter(ci => {
@@ -1450,14 +1542,23 @@ function CalendarView({ currentUser, staff, clients, sessions, classInstances, c
   };
 
   // ── event pill ─────────────────────────────────────────────────────────────
-  const EventPill = ({ ev, compact }) => (
-    <div style={{ background: ev.color + (ev.kind === "block" ? "30" : "22"), borderLeft: `3px solid ${ev.color}`, borderRadius: 6, padding: compact ? "2px 6px" : "4px 8px", marginBottom: 3, overflow: "hidden" }}>
-      <div style={{ fontSize: compact ? 10 : 12, fontWeight: 800, color: ev.color, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-        {ev.kind !== "block" && <span style={{ opacity: 0.8 }}>{fmt12(ev.time)} </span>}{ev.label}
+  const EventPill = ({ ev, compact }) => {
+    const clickable = ev.kind === "session" && ev.clientId;
+    const handleClick = (e) => {
+      if (!clickable) return;
+      e.stopPropagation();
+      const c = clients.find(cl => cl.id === ev.clientId);
+      if (c) setSelectedClient(c);
+    };
+    return (
+      <div onClick={handleClick} style={{ background: ev.color + (ev.kind === "block" ? "30" : "22"), borderLeft: `3px solid ${ev.color}`, borderRadius: 6, padding: compact ? "2px 6px" : "4px 8px", marginBottom: 3, overflow: "hidden", cursor: clickable ? "pointer" : "default" }}>
+        <div style={{ fontSize: compact ? 10 : 12, fontWeight: 800, color: ev.color, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {ev.kind !== "block" && <span style={{ opacity: 0.8 }}>{fmt12(ev.time)} </span>}{ev.label}{clickable && !compact ? <span style={{ opacity: 0.5, fontSize: 9 }}> ›</span> : ""}
+        </div>
+        {!compact && ev.sub && <div style={{ fontSize: 10, color: C.steel, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ev.sub}</div>}
       </div>
-      {!compact && ev.sub && <div style={{ fontSize: 10, color: C.steel, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ev.sub}</div>}
-    </div>
-  );
+    );
+  };
 
   // ── iCal export ────────────────────────────────────────────────────────────
   const exportICal = () => {
@@ -1595,6 +1696,9 @@ function CalendarView({ currentUser, staff, clients, sessions, classInstances, c
           </div>
         );
       })()}
+
+      {/* Client detail modal */}
+      {selectedClient && <ClientDetailModal client={selectedClient} sessions={sessions} dogNotes={dogNotes} setDogNotes={setDogNotes} currentUser={currentUser} onClose={() => setSelectedClient(null)} />}
 
       {/* Blocked dates list */}
       {myBlocks.length > 0 && (
@@ -1764,13 +1868,14 @@ function ScheduleManager({ currentUser, schedule, setSchedule, oneOffSlots, setO
   );
 }
 
-function Sessions({ currentUser, staff, clients, sessions, setSessions, schedule, oneOffSlots }) {
+function Sessions({ currentUser, staff, clients, sessions, setSessions, schedule, oneOffSlots, dogNotes, setDogNotes }) {
   const [filter, setFilter] = useState("upcoming");
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [form, setForm] = useState({ clientId: "", trainerId: "", date: "", time: "", type: "facility", duration: 60, price: 90, notes: "", paid: false });
   const [reminderSent, setReminderSent] = useState([]);
   const [reviewSent, setReviewSent] = useState([]);
+  const [selectedClient, setSelectedClient] = useState(null);
 
   const mine = sessions.filter(s => currentUser.role === "admin" || s.trainerId === currentUser.id);
   const filtered = mine.filter(s => {
@@ -1823,7 +1928,7 @@ function Sessions({ currentUser, staff, clients, sessions, setSessions, schedule
               <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 4 }}>
-                    <span style={{ fontWeight: 800, fontSize: 15, color: C.obsidian }}>{client?.name}</span>
+                    <span onClick={() => client && setSelectedClient(client)} style={{ fontWeight: 800, fontSize: 15, color: C.obsidian, cursor: client ? "pointer" : "default", textDecoration: client ? "underline" : "none", textDecorationColor: C.gold, textUnderlineOffset: 3 }}>{client?.name}</span>
                     <Pill color={st.location === "facility" ? C.sage : C.gold}>{st.label}</Pill>
                     <Pill color={s.paid ? C.sage : C.rust}>{s.paid ? "Paid" : "Unpaid"}</Pill>
                     {s.status === "cancelled" && <Pill color={C.silver}>Cancelled</Pill>}
@@ -1850,6 +1955,8 @@ function Sessions({ currentUser, staff, clients, sessions, setSessions, schedule
         })}
         {filtered.length === 0 && <p style={{ color: C.silver }}>No sessions found.</p>}
       </div>
+
+      {selectedClient && <ClientDetailModal client={selectedClient} sessions={sessions} dogNotes={dogNotes} setDogNotes={setDogNotes} currentUser={currentUser} onClose={() => setSelectedClient(null)} />}
 
       {showModal && (
         <Modal title={editItem ? "Edit Session" : "Book Private Session"} onClose={() => setShowModal(false)}>
