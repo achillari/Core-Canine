@@ -356,7 +356,7 @@ function Onboarding({ client, onComplete }) {
   const [step, setStep] = useState(1);
   const [profile, setProfile] = useState({ name: "", email: "", phone: client.phone || "" });
   const [dogs, setDogs] = useState([]);
-  const [dogForm, setDogForm] = useState({ name: "", breed: "", age: "", sex: "Male", neutered: false, birthday: "", notes: "", photo: null, vaccineDoc: null });
+  const [dogForm, setDogForm] = useState({ name: "", breed: "", age: "", ageUnit: "years", sex: "Male", neutered: false, birthday: "", notes: "", photo: null, vaccineDoc: null });
   const [waiverChecked, setWaiverChecked] = useState(false);
   const [policyChecked, setPolicyChecked] = useState(false);
   const photoRef = useRef();
@@ -365,10 +365,23 @@ function Onboarding({ client, onComplete }) {
   const WAIVER = "I understand that dog training involves inherent risks including potential injury to myself, my dog, other participants, or trainers. I agree that Core Canine and its trainers are not liable for any injury, property damage, or loss arising from training sessions or classes. I confirm that my dog is current on all required vaccinations including Rabies, Distemper, and Bordetella. I agree to disclose any known behavioral concerns prior to sessions.";
   const POLICY = "Cancellations made more than 72 hours before your session may be rescheduled at no charge. Cancellations within 72 hours of your session are non-refundable. You may reschedule your own sessions up to 72 hours in advance through this app. Classes cannot be rescheduled — if you miss a class session, it cannot be made up or refunded.";
 
+  const calcAgeFromBirthday = (dob) => {
+    if (!dob) return { age: "", ageUnit: "years" };
+    const birth = new Date(dob + "T12:00:00");
+    const now = new Date();
+    const totalDays = Math.floor((now - birth) / 86400000);
+    if (totalDays < 0) return { age: "", ageUnit: "years" };
+    if (totalDays < 84) return { age: String(Math.max(1, Math.round(totalDays / 7))), ageUnit: "weeks" };
+    const months = (now.getFullYear() - birth.getFullYear()) * 12 + (now.getMonth() - birth.getMonth());
+    if (months < 24) return { age: String(Math.max(1, months)), ageUnit: "months" };
+    const years = now.getFullYear() - birth.getFullYear() - (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate()) ? 1 : 0);
+    return { age: String(Math.max(1, years)), ageUnit: "years" };
+  };
+
   const addDog = () => {
     if (!dogForm.name) return;
-    setDogs(d => [...d, { ...dogForm, id: Date.now(), age: parseInt(dogForm.age) || 0 }]);
-    setDogForm({ name: "", breed: "", age: "", sex: "Male", neutered: false, birthday: "", notes: "", photo: null, vaccineDoc: null });
+    setDogs(d => [...d, { ...dogForm, id: Date.now() }]);
+    setDogForm({ name: "", breed: "", age: "", ageUnit: "years", sex: "Male", neutered: false, birthday: "", notes: "", photo: null, vaccineDoc: null });
   };
 
   return (
@@ -400,7 +413,7 @@ function Onboarding({ client, onComplete }) {
               {dogs.map((dog, i) => (
                 <div key={dog.id} style={{ background: C.cream, borderRadius: 12, padding: "10px 14px", display: "flex", gap: 10, alignItems: "center" }}>
                   <div style={{ fontSize: 22 }}>{dog.photo ? <img src={dog.photo} alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover" }} /> : "🐕"}</div>
-                  <div style={{ flex: 1 }}><b>{dog.name}</b> · {dog.breed} · {dog.age} yr</div>
+                  <div style={{ flex: 1 }}><b>{dog.name}</b> · {dog.breed} · {dog.age} {dog.ageUnit}</div>
                   <button onClick={() => setDogs(d => d.filter((_, j) => j !== i))} style={{ background: "none", border: "none", color: C.rust, cursor: "pointer", fontWeight: 800 }}>✕</button>
                 </div>
               ))}
@@ -411,18 +424,33 @@ function Onboarding({ client, onComplete }) {
                     <Input label="Name" placeholder="Biscuit" value={dogForm.name} onChange={e => setDogForm(f => ({ ...f, name: e.target.value }))} />
                     <Input label="Breed" placeholder="Golden Retriever" value={dogForm.breed} onChange={e => setDogForm(f => ({ ...f, breed: e.target.value }))} />
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-                    <Input label="Age (yrs)" type="number" value={dogForm.age} onChange={e => setDogForm(f => ({ ...f, age: e.target.value }))} />
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                     <Sel label="Sex" value={dogForm.sex} onChange={e => setDogForm(f => ({ ...f, sex: e.target.value }))}><option>Male</option><option>Female</option></Sel>
                     <Field label="Fixed?"><label style={{ display: "flex", gap: 6, alignItems: "center", height: 42, cursor: "pointer", fontSize: 14 }}><input type="checkbox" checked={dogForm.neutered} onChange={e => setDogForm(f => ({ ...f, neutered: e.target.checked }))} />Yes</label></Field>
                   </div>
-                  <Input label="Birthday (optional)" type="date" value={dogForm.birthday} onChange={e => setDogForm(f => ({ ...f, birthday: e.target.value }))} />
+                  <Field label="Age">
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <input type="number" min="0" style={{ ...inputStyle, flex: 1 }} placeholder="e.g. 8" value={dogForm.age} onChange={e => setDogForm(f => ({ ...f, age: e.target.value }))} />
+                      <select style={{ ...inputStyle, width: 110 }} value={dogForm.ageUnit} onChange={e => setDogForm(f => ({ ...f, ageUnit: e.target.value }))}>
+                        <option value="weeks">weeks</option>
+                        <option value="months">months</option>
+                        <option value="years">years</option>
+                      </select>
+                    </div>
+                  </Field>
+                  <Field label="Birthday (optional)" hint="Entering a birthday will auto-fill age">
+                    <input type="date" style={inputStyle} value={dogForm.birthday} onChange={e => {
+                      const dob = e.target.value;
+                      const calc = calcAgeFromBirthday(dob);
+                      setDogForm(f => ({ ...f, birthday: dob, ...calc }));
+                    }} />
+                  </Field>
                   <TextArea label="Behavioral Notes" placeholder="Leash reactive, shy, any health issues..." value={dogForm.notes} onChange={e => setDogForm(f => ({ ...f, notes: e.target.value }))} />
                   <Field label="Dog Photo (optional)">
                     <input type="file" accept="image/*" ref={photoRef} onChange={e => { const f = e.target.files[0]; if (f) { const r = new FileReader(); r.onload = x => setDogForm(d => ({ ...d, photo: x.target.result })); r.readAsDataURL(f); } }} style={{ display: "none" }} />
                     <button onClick={() => photoRef.current.click()} style={{ ...inputStyle, cursor: "pointer", textAlign: "left", background: C.white, color: dogForm.photo ? C.sage : C.silver, fontSize: 13 }}>{dogForm.photo ? "✓ Photo added" : "📷 Upload photo"}</button>
                   </Field>
-                  <Btn variant="sky" onClick={addDog}>+ Add {dogForm.name || "Dog"}</Btn>
+                  <Btn variant="sky" onClick={addDog}>✓ Save {dogForm.name || "Dog"}</Btn>
                 </div>
               </div>
               <div style={{ display: "flex", gap: 10 }}>
