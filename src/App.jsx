@@ -180,7 +180,8 @@ const Step = ({ number, label, active, done }) => (
 // ─── NAV CONFIG ────────────────────────────────────────────────────────────────
 const NAV_ADMIN = [
   { id: "dashboard", icon: "◈", label: "Dashboard" },
-  { id: "schedule", icon: "◷", label: "My Schedule" },
+  { id: "calendar", icon: "📅", label: "Calendar" },
+  { id: "schedule", icon: "◷", label: "My Availability" },
   { id: "sessions", icon: "◎", label: "Sessions" },
   { id: "classes", icon: "◑", label: "Classes" },
   { id: "clients", icon: "◉", label: "Clients" },
@@ -193,7 +194,8 @@ const NAV_ADMIN = [
 ];
 const NAV_TRAINER = [
   { id: "dashboard", icon: "◈", label: "Dashboard" },
-  { id: "schedule", icon: "◷", label: "My Schedule" },
+  { id: "calendar", icon: "📅", label: "Calendar" },
+  { id: "schedule", icon: "◷", label: "My Availability" },
   { id: "sessions", icon: "◎", label: "My Sessions" },
   { id: "clients", icon: "◉", label: "My Clients" },
   { id: "messages", icon: "◻", label: "Messages" },
@@ -1138,6 +1140,314 @@ function Dashboard({ currentUser, staff, clients, sessions, classInstances, clas
           })}
         </Card>
       </div>
+    </div>
+  );
+}
+
+// ─── CALENDAR VIEW ────────────────────────────────────────────────────────────
+function CalendarView({ currentUser, staff, clients, sessions, classInstances, classTemplates, blockedDates, setBlockedDates }) {
+  const [view, setView] = useState("week");
+  const [anchor, setAnchor] = useState(today); // "YYYY-MM-DD" reference date
+  const [showBlockModal, setShowBlockModal] = useState(false);
+  const [blockForm, setBlockForm] = useState({ startDate: "", endDate: "", reason: "" });
+  const [showIcalModal, setShowIcalModal] = useState(false);
+
+  const isAdmin = currentUser.role === "admin";
+
+  // ── date math helpers ──────────────────────────────────────────────────────
+  const addDays = (ds, n) => { const d = new Date(ds + "T12:00:00"); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+  const startOfWeek = ds => { const d = new Date(ds + "T12:00:00"); const dow = d.getDay(); const diff = dow === 0 ? -6 : 1 - dow; d.setDate(d.getDate() + diff); return d.toISOString().slice(0, 10); };
+  const startOfMonth = ds => ds.slice(0, 8) + "01";
+  const daysInMonth = ds => new Date(parseInt(ds.slice(0, 4)), parseInt(ds.slice(5, 7)), 0).getDate();
+  const weekDays = () => { const s = startOfWeek(anchor); return Array.from({ length: 7 }, (_, i) => addDays(s, i)); };
+  const monthDays = () => {
+    const s = startOfMonth(anchor);
+    const first = new Date(s + "T12:00:00").getDay(); // 0=Sun
+    const blanks = first === 0 ? 6 : first - 1; // shift so Mon=0
+    const total = daysInMonth(anchor);
+    return { blanks, total, start: s };
+  };
+  const dayLabel = ds => new Date(ds + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  const monthLabel = ds => new Date(ds + "T12:00:00").toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const shortDay = ds => new Date(ds + "T12:00:00").toLocaleDateString("en-US", { weekday: "short" });
+  const dateNum = ds => new Date(ds + "T12:00:00").getDate();
+  const isToday = ds => ds === today;
+
+  // ── navigation ─────────────────────────────────────────────────────────────
+  const prev = () => {
+    if (view === "day")   setAnchor(a => addDays(a, -1));
+    if (view === "week")  setAnchor(a => addDays(startOfWeek(a), -7));
+    if (view === "month") setAnchor(a => { const d = new Date(a + "T12:00:00"); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 10); });
+  };
+  const next = () => {
+    if (view === "day")   setAnchor(a => addDays(a, 1));
+    if (view === "week")  setAnchor(a => addDays(startOfWeek(a), 7));
+    if (view === "month") setAnchor(a => { const d = new Date(a + "T12:00:00"); d.setMonth(d.getMonth() + 1); return d.toISOString().slice(0, 10); });
+  };
+
+  // ── title ──────────────────────────────────────────────────────────────────
+  const title = () => {
+    if (view === "day") return dayLabel(anchor);
+    if (view === "week") { const days = weekDays(); return `${fmtDateShort(days[0])} – ${fmtDateShort(days[6])}`; }
+    return monthLabel(anchor);
+  };
+
+  // ── events builder ─────────────────────────────────────────────────────────
+  const getEventsForDate = ds => {
+    const events = [];
+    const mySessions = isAdmin ? sessions : sessions.filter(s => s.trainerId === currentUser.id);
+    mySessions.filter(s => s.date === ds && s.status !== "cancelled").forEach(s => {
+      const client = clients.find(c => c.id === s.clientId);
+      const trainer = staff.find(t => t.id === s.trainerId);
+      const st = getSessionType(s.sessionType);
+      events.push({
+        key: `s-${s.id}`, time: s.time, label: client?.name || "Session",
+        sub: isAdmin ? `${trainer?.firstName || trainer?.name} · ${st.label}` : st.label,
+        color: st.location === "facility" ? C.sage : C.gold, kind: "session"
+      });
+    });
+    classInstances.filter(ci => {
+      const weeks = classTemplates.find(t => t.id === ci.templateId)?.weeks || 1;
+      for (let w = 0; w < weeks; w++) { if (addDays(ci.startDate, w * 7) === ds) return true; }
+      return false;
+    }).forEach(ci => {
+      const tmpl = classTemplates.find(t => t.id === ci.templateId);
+      const trainer = staff.find(t => t.id === ci.instructorId);
+      if (isAdmin || ci.instructorId === currentUser.id) {
+        events.push({
+          key: `c-${ci.id}-${ds}`, time: ci.time, label: tmpl?.name || "Class",
+          sub: isAdmin ? `${trainer?.firstName || trainer?.name} · ${ci.enrolledIds.length} enrolled` : `${ci.enrolledIds.length} enrolled`,
+          color: C.sky, kind: "class"
+        });
+      }
+    });
+    // blocked dates
+    (isAdmin ? blockedDates : blockedDates.filter(b => b.trainerId === currentUser.id))
+      .filter(b => ds >= b.startDate && ds <= b.endDate)
+      .forEach(b => {
+        const trainer = staff.find(t => t.id === b.trainerId);
+        events.push({
+          key: `b-${b.id}-${ds}`, time: "00:00", label: isAdmin ? `${trainer?.firstName || trainer?.name}: Time Off` : "Time Off",
+          sub: b.reason || "", color: C.steel, kind: "block"
+        });
+      });
+    return events.sort((a, b) => a.time.localeCompare(b.time));
+  };
+
+  // ── event pill ─────────────────────────────────────────────────────────────
+  const EventPill = ({ ev, compact }) => (
+    <div style={{ background: ev.color + (ev.kind === "block" ? "30" : "22"), borderLeft: `3px solid ${ev.color}`, borderRadius: 6, padding: compact ? "2px 6px" : "4px 8px", marginBottom: 3, overflow: "hidden" }}>
+      <div style={{ fontSize: compact ? 10 : 12, fontWeight: 800, color: ev.color, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        {ev.kind !== "block" && <span style={{ opacity: 0.8 }}>{fmt12(ev.time)} </span>}{ev.label}
+      </div>
+      {!compact && ev.sub && <div style={{ fontSize: 10, color: C.steel, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ev.sub}</div>}
+    </div>
+  );
+
+  // ── iCal export ────────────────────────────────────────────────────────────
+  const exportICal = () => {
+    const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Core Canine//App//EN", "CALSCALE:GREGORIAN"];
+    const fmtIcal = (ds, ts) => {
+      const [y, mo, d] = ds.split("-"); const [h, m] = (ts || "00:00").split(":");
+      return `${y}${mo}${d}T${h}${m}00`;
+    };
+    const mySessions = isAdmin ? sessions : sessions.filter(s => s.trainerId === currentUser.id);
+    mySessions.filter(s => s.status !== "cancelled").forEach(s => {
+      const client = clients.find(c => c.id === s.clientId);
+      const st = getSessionType(s.sessionType);
+      lines.push("BEGIN:VEVENT",
+        `UID:session-${s.id}@corecanine`,
+        `DTSTART:${fmtIcal(s.date, s.time)}`,
+        `DURATION:PT${s.duration || 90}M`,
+        `SUMMARY:${client?.name || "Client"} – ${st.label}`,
+        `DESCRIPTION:$${s.price} · ${s.paid ? "Paid" : "Unpaid"}`,
+        "END:VEVENT");
+    });
+    classInstances.forEach(ci => {
+      if (!isAdmin && ci.instructorId !== currentUser.id) return;
+      const tmpl = classTemplates.find(t => t.id === ci.templateId);
+      const weeks = tmpl?.weeks || 1;
+      lines.push("BEGIN:VEVENT",
+        `UID:class-${ci.id}@corecanine`,
+        `DTSTART:${fmtIcal(ci.startDate, ci.time)}`,
+        `DURATION:PT${ci.duration || 60}M`,
+        `RRULE:FREQ=WEEKLY;COUNT=${weeks}`,
+        `SUMMARY:${tmpl?.name || "Class"} (${ci.enrolledIds.length} enrolled)`,
+        "END:VEVENT");
+    });
+    lines.push("END:VCALENDAR");
+    const blob = new Blob([lines.join("\r\n")], { type: "text/calendar" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = "core-canine-schedule.ics"; a.click();
+    URL.revokeObjectURL(url);
+    setShowIcalModal(false);
+  };
+
+  // ── block form save ────────────────────────────────────────────────────────
+  const saveBlock = () => {
+    if (!blockForm.startDate) return;
+    const end = blockForm.endDate || blockForm.startDate;
+    setBlockedDates(bs => [...bs, { id: Date.now(), trainerId: currentUser.id, startDate: blockForm.startDate, endDate: end, reason: blockForm.reason }]);
+    setBlockForm({ startDate: "", endDate: "", reason: "" });
+    setShowBlockModal(false);
+  };
+
+  const myBlocks = isAdmin ? blockedDates : blockedDates.filter(b => b.trainerId === currentUser.id);
+
+  // ── RENDER ─────────────────────────────────────────────────────────────────
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+        <h1 style={{ fontFamily: "Georgia, serif", fontSize: 26, color: C.obsidian, margin: 0 }}>Calendar</h1>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <Btn variant="ghost" small onClick={() => setShowBlockModal(true)}>🚫 Block Time</Btn>
+          <Btn variant="ghost" small onClick={() => setShowIcalModal(true)}>📆 Export to Apple Calendar</Btn>
+        </div>
+      </div>
+
+      {/* View switcher + navigation */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+        <div style={{ display: "flex", gap: 6 }}>
+          {["day", "week", "month"].map(v => (
+            <button key={v} onClick={() => setView(v)} style={{ padding: "7px 16px", borderRadius: 20, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 12, textTransform: "capitalize", background: view === v ? C.obsidian : C.fog, color: view === v ? C.cream : C.charcoal }}>{v}</button>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button onClick={prev} style={{ background: C.fog, border: "none", borderRadius: 8, padding: "7px 13px", cursor: "pointer", fontWeight: 800, fontSize: 14 }}>‹</button>
+          <span style={{ fontWeight: 700, fontSize: 14, color: C.obsidian, minWidth: 180, textAlign: "center" }}>{title()}</span>
+          <button onClick={next} style={{ background: C.fog, border: "none", borderRadius: 8, padding: "7px 13px", cursor: "pointer", fontWeight: 800, fontSize: 14 }}>›</button>
+          <button onClick={() => setAnchor(today)} style={{ background: C.gold + "22", border: "none", borderRadius: 8, padding: "7px 12px", cursor: "pointer", fontWeight: 700, fontSize: 12, color: C.gold }}>Today</button>
+        </div>
+      </div>
+
+      {/* DAY VIEW */}
+      {view === "day" && (() => {
+        const events = getEventsForDate(anchor);
+        return (
+          <Card>
+            <div style={{ fontWeight: 800, fontSize: 15, color: C.obsidian, marginBottom: 14, borderBottom: `1px solid ${C.fog}`, paddingBottom: 10 }}>{dayLabel(anchor)}</div>
+            {events.length === 0
+              ? <p style={{ color: C.silver, fontStyle: "italic" }}>No sessions or classes scheduled.</p>
+              : events.map(ev => <EventPill key={ev.key} ev={ev} />)}
+          </Card>
+        );
+      })()}
+
+      {/* WEEK VIEW */}
+      {view === "week" && (() => {
+        const days = weekDays();
+        return (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6 }}>
+            {days.map(ds => {
+              const events = getEventsForDate(ds);
+              return (
+                <div key={ds} onClick={() => { setAnchor(ds); setView("day"); }} style={{ background: isToday(ds) ? C.gold + "12" : C.white, borderRadius: 12, padding: "10px 8px", cursor: "pointer", border: `1.5px solid ${isToday(ds) ? C.gold : C.fog}`, minHeight: 100 }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: isToday(ds) ? C.gold : C.silver, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>{shortDay(ds)}</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: isToday(ds) ? C.gold : C.obsidian, marginBottom: 6 }}>{dateNum(ds)}</div>
+                  {events.slice(0, 3).map(ev => <EventPill key={ev.key} ev={ev} compact />)}
+                  {events.length > 3 && <div style={{ fontSize: 10, color: C.silver, fontWeight: 700, marginTop: 2 }}>+{events.length - 3} more</div>}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
+
+      {/* MONTH VIEW */}
+      {view === "month" && (() => {
+        const { blanks, total, start } = monthDays();
+        const DAY_HEADERS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+        return (
+          <div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, marginBottom: 4 }}>
+              {DAY_HEADERS.map(d => <div key={d} style={{ textAlign: "center", fontSize: 11, fontWeight: 800, color: C.silver, textTransform: "uppercase", padding: "6px 0" }}>{d}</div>)}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2 }}>
+              {Array.from({ length: blanks }).map((_, i) => <div key={`b${i}`} />)}
+              {Array.from({ length: total }, (_, i) => {
+                const ds = addDays(start, i);
+                const events = getEventsForDate(ds);
+                return (
+                  <div key={ds} onClick={() => { setAnchor(ds); setView("day"); }} style={{ background: isToday(ds) ? C.gold + "12" : C.white, border: `1.5px solid ${isToday(ds) ? C.gold : C.fog}`, borderRadius: 8, padding: "6px 5px", minHeight: 72, cursor: "pointer" }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: isToday(ds) ? C.gold : C.obsidian, marginBottom: 3 }}>{dateNum(ds)}</div>
+                    {events.slice(0, 2).map(ev => <EventPill key={ev.key} ev={ev} compact />)}
+                    {events.length > 2 && <div style={{ fontSize: 9, color: C.silver, fontWeight: 700 }}>+{events.length - 2}</div>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Blocked dates list */}
+      {myBlocks.length > 0 && (
+        <div style={{ marginTop: 28 }}>
+          <div style={{ fontWeight: 800, fontSize: 13, color: C.silver, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 10 }}>Time-Off Blocks</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {myBlocks.map(b => {
+              const trainer = staff.find(t => t.id === b.trainerId);
+              return (
+                <div key={b.id} style={{ background: C.fog, borderRadius: 10, padding: "8px 14px", display: "flex", gap: 10, alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: C.obsidian }}>
+                      {isAdmin && <span style={{ color: C.gold }}>{trainer?.firstName || trainer?.name}: </span>}
+                      {b.startDate === b.endDate ? fmtDate(b.startDate) : `${fmtDate(b.startDate)} – ${fmtDate(b.endDate)}`}
+                    </div>
+                    {b.reason && <div style={{ fontSize: 12, color: C.steel, fontStyle: "italic" }}>{b.reason}</div>}
+                  </div>
+                  {(isAdmin || b.trainerId === currentUser.id) && (
+                    <button onClick={() => setBlockedDates(bs => bs.filter(x => x.id !== b.id))} style={{ background: "none", border: "none", color: C.rust, cursor: "pointer", fontWeight: 800, fontSize: 14 }}>✕</button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Block Time modal */}
+      {showBlockModal && (
+        <Modal title="Block Time Off" onClose={() => setShowBlockModal(false)}>
+          <div style={{ display: "grid", gap: 14 }}>
+            <p style={{ color: C.steel, fontSize: 13, margin: 0 }}>Clients won't see available slots during blocked dates — no "out of office" message is shown to them.</p>
+            {isAdmin && (
+              <Sel label="Block for" value={blockForm.trainerId || ""} onChange={e => setBlockForm(f => ({ ...f, trainerId: e.target.value || currentUser.id }))}>
+                <option value="">Myself ({currentUser.name})</option>
+                {staff.filter(s => s.active && s.id !== currentUser.id).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </Sel>
+            )}
+            <Input label="Start Date" type="date" value={blockForm.startDate} onChange={e => setBlockForm(f => ({ ...f, startDate: e.target.value }))} />
+            <Input label="End Date" hint="Same as start date for a single day" type="date" value={blockForm.endDate} onChange={e => setBlockForm(f => ({ ...f, endDate: e.target.value }))} />
+            <Input label="Internal note (optional — not shown to clients)" value={blockForm.reason} placeholder="Vacation, conference, sick day…" onChange={e => setBlockForm(f => ({ ...f, reason: e.target.value }))} />
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <Btn variant="ghost" onClick={() => setShowBlockModal(false)}>Cancel</Btn>
+              <Btn onClick={saveBlock}>Save Block</Btn>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* iCal export modal */}
+      {showIcalModal && (
+        <Modal title="Export to Apple Calendar" onClose={() => setShowIcalModal(false)}>
+          <div style={{ display: "grid", gap: 16 }}>
+            <div style={{ background: C.cream, borderRadius: 10, padding: "14px 16px", fontSize: 13, color: C.steel, lineHeight: 1.7 }}>
+              <b style={{ color: C.obsidian }}>What's included:</b><br />
+              {isAdmin ? "All sessions and classes across all trainers." : "Your sessions and classes only."}<br /><br />
+              <b style={{ color: C.obsidian }}>How to import:</b><br />
+              1. Tap Export to download the .ics file<br />
+              2. Open it on your iPhone — Calendar will offer to import<br />
+              3. Or on Mac: double-click the file to add to Calendar
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <Btn variant="ghost" onClick={() => setShowIcalModal(false)}>Cancel</Btn>
+              <Btn onClick={exportICal}>📆 Export .ics File</Btn>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
@@ -2278,11 +2588,11 @@ function SettingsPage({ settings, setSettings }) {
 }
 
 // ─── STAFF PORTAL WRAPPER ─────────────────────────────────────────────────────
-function StaffPortal({ currentUser, onSignOut, staff, setStaff, clients, setClients, sessions, setSessions, classTemplates, setClassTemplates, classInstances, setClassInstances, schedule, setSchedule, oneOffSlots, setOneOffSlots, homeworkCards, setHomeworkCards, discountCodes, setDiscountCodes, giftCards, setGiftCards, messages, setMessages, dogNotes, setDogNotes, refunds, settings, setSettings }) {
+function StaffPortal({ currentUser, onSignOut, staff, setStaff, clients, setClients, sessions, setSessions, classTemplates, setClassTemplates, classInstances, setClassInstances, schedule, setSchedule, oneOffSlots, setOneOffSlots, blockedDates, setBlockedDates, homeworkCards, setHomeworkCards, discountCodes, setDiscountCodes, giftCards, setGiftCards, messages, setMessages, dogNotes, setDogNotes, refunds, settings, setSettings }) {
   const [page, setPage] = useState("dashboard");
   const [navOpen, setNavOpen] = useState(true);
   const nav = currentUser.role === "admin" ? NAV_ADMIN : NAV_TRAINER;
-  const pageProps = { currentUser, staff, setStaff, clients, setClients, sessions, setSessions, classTemplates, setClassTemplates, classInstances, setClassInstances, schedule, setSchedule, oneOffSlots, setOneOffSlots, homeworkCards, setHomeworkCards, discountCodes, setDiscountCodes, giftCards, setGiftCards, messages, setMessages, dogNotes, setDogNotes, refunds, settings, setSettings };
+  const pageProps = { currentUser, staff, setStaff, clients, setClients, sessions, setSessions, classTemplates, setClassTemplates, classInstances, setClassInstances, schedule, setSchedule, oneOffSlots, setOneOffSlots, blockedDates, setBlockedDates, homeworkCards, setHomeworkCards, discountCodes, setDiscountCodes, giftCards, setGiftCards, messages, setMessages, dogNotes, setDogNotes, refunds, settings, setSettings };
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: C.cream, fontFamily: "Georgia, serif" }}>
@@ -2312,6 +2622,7 @@ function StaffPortal({ currentUser, onSignOut, staff, setStaff, clients, setClie
       {/* Main */}
       <main style={{ flex: 1, padding: "32px 30px", overflowX: "hidden", maxWidth: "calc(100vw - 62px)" }}>
         {page === "dashboard" && <Dashboard {...pageProps} />}
+        {page === "calendar" && <CalendarView {...pageProps} />}
         {page === "schedule" && <ScheduleManager {...pageProps} />}
         {page === "sessions" && <Sessions {...pageProps} />}
         {page === "classes" && <Classes {...pageProps} />}
@@ -2343,6 +2654,7 @@ export default function App() {
   const [classInstances, setClassInstances] = useState(SEED_CLASS_INSTANCES);
   const [schedule, setSchedule] = useState(SEED_SCHEDULE);
   const [oneOffSlots, setOneOffSlots] = useState([]);
+  const [blockedDates, setBlockedDates] = useState([]);
   const [homeworkCards, setHomeworkCards] = useState(SEED_HOMEWORK);
   const [discountCodes, setDiscountCodes] = useState(SEED_DISCOUNT_CODES);
   const [giftCards, setGiftCards] = useState(SEED_GIFT_CARDS);
@@ -2420,6 +2732,7 @@ export default function App() {
       classInstances={classInstances} setClassInstances={setClassInstances}
       schedule={schedule} setSchedule={setSchedule}
       oneOffSlots={oneOffSlots} setOneOffSlots={setOneOffSlots}
+      blockedDates={blockedDates} setBlockedDates={setBlockedDates}
       homeworkCards={homeworkCards} setHomeworkCards={setHomeworkCards}
       discountCodes={discountCodes} setDiscountCodes={setDiscountCodes}
       giftCards={giftCards} setGiftCards={setGiftCards}
