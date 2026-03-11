@@ -102,6 +102,13 @@ const SEED_REFUNDS = [
   { id: 1, clientId: 1, sessionId: 1, amount: 90, date: "2026-02-20", reason: "Trainer illness — full refund", processedBy: "Admin" },
 ];
 
+const SEED_EMAIL_TEMPLATES = [
+  { id: 1, name: "Session Confirmation", subject: "Your Core Canine session is confirmed!", body: "Hi {{clientName}},\n\nGreat news — your session is confirmed!\n\n📅 {{sessionDate}} at {{sessionTime}}\n📍 {{sessionLocation}}\n👤 Trainer: {{trainerName}}\n\nIf you need to reschedule, please do so at least 72 hours in advance through the client portal.\n\nWe can't wait to work with you and {{dogName}}!\n\n— The Core Canine Team", active: true },
+  { id: 2, name: "Class Enrollment Confirmation", subject: "You're enrolled in {{className}}!", body: "Hi {{clientName}},\n\nWelcome to {{className}}!\n\n📅 Starts {{startDate}} · {{classTime}}\n👤 Instructor: {{trainerName}}\n{{sessionDates}}\n\nPlease remember to bring:\n• Your dog on a 4–6 ft leash (no retractables)\n• High-value treats\n• Proof of vaccination\n\nSee you soon!\n\n— The Core Canine Team", active: true },
+  { id: 3, name: "Session Reminder", subject: "Reminder: Your session is tomorrow!", body: "Hi {{clientName}},\n\nJust a friendly reminder that you have a session tomorrow:\n\n📅 {{sessionDate}} at {{sessionTime}}\n📍 {{sessionLocation}}\n👤 Trainer: {{trainerName}}\n\nSee you soon!\n\n— Core Canine", active: true },
+  { id: 4, name: "Homework Follow-Up", subject: "Your homework from today's session 🐾", body: "Hi {{clientName}},\n\nGreat work today! Here are the exercises we covered. Practice a little every day — short sessions work best.\n\n{{homeworkList}}\n\nQuestions? Reply to this email anytime.\n\n— {{trainerName}}", active: true },
+];
+
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 const fmt12 = t => { if (!t) return ""; const [h, m] = t.split(":"); const hr = parseInt(h); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? "PM" : "AM"}`; };
 const fmtDate = d => { if (!d) return ""; return new Date(d + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); };
@@ -189,6 +196,7 @@ const NAV_ADMIN = [
   { id: "homework", icon: "◈", label: "Homework Cards" },
   { id: "staff", icon: "◐", label: "Staff" },
   { id: "discounts", icon: "◇", label: "Discounts & Gift Cards" },
+  { id: "emails", icon: "✉", label: "Emails" },
   { id: "reports", icon: "◆", label: "Reports" },
   { id: "settings", icon: "◌", label: "Settings" },
 ];
@@ -2544,6 +2552,284 @@ function DiscountsAndGiftCards({ discountCodes, setDiscountCodes, giftCards, set
   );
 }
 
+// ─── EMAIL CENTER ─────────────────────────────────────────────────────────────
+function EmailCenter({ currentUser, clients, sessions, classInstances, classTemplates, staff, emailTemplates, setEmailTemplates, settings }) {
+  const [tab, setTab] = useState("send");
+  const [editTmpl, setEditTmpl] = useState(null);
+  const [tmplForm, setTmplForm] = useState({ name: "", subject: "", body: "", active: true });
+  const [showTmplModal, setShowTmplModal] = useState(false);
+
+  // ── Send Email tab state ───────────────────────────────────────────────────
+  const [sendMode, setSendMode] = useState("individual"); // "individual" | "class"
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [selectedClientId, setSelectedClientId] = useState("");
+  const [selectedClassId, setSelectedClassId] = useState("");
+  const [customSubject, setCustomSubject] = useState("");
+  const [customBody, setCustomBody] = useState("");
+  const [sent, setSent] = useState(false);
+  const [sentLog, setSentLog] = useState([]);
+
+  const fromEmail = settings?.businessEmail || "april@corecanine.com";
+
+  // Fill editor when template is picked
+  const pickTemplate = (id) => {
+    setSelectedTemplateId(id);
+    const t = emailTemplates.find(t => String(t.id) === String(id));
+    if (t) { setCustomSubject(t.subject); setCustomBody(t.body); }
+    else { setCustomSubject(""); setCustomBody(""); }
+  };
+
+  // Merge basic vars for preview
+  const mergeVars = (text, client) => {
+    if (!text || !client) return text || "";
+    const dog = client.dogs?.[0];
+    return text
+      .replace(/{{clientName}}/g, client.name || "")
+      .replace(/{{dogName}}/g, dog?.name || "your dog")
+      .replace(/{{trainerName}}/g, currentUser.name || "")
+      .replace(/{{sessionDate}}/g, fmtDate(today))
+      .replace(/{{sessionTime}}/g, "10:00 AM")
+      .replace(/{{sessionLocation}}/g, "At our training facility")
+      .replace(/{{className}}/g, "[Class Name]")
+      .replace(/{{startDate}}/g, fmtDate(today))
+      .replace(/{{classTime}}/g, "6:00 PM")
+      .replace(/{{sessionDates}}/g, "[Session dates listed here]")
+      .replace(/{{homeworkList}}/g, "[Homework exercises listed here]");
+  };
+
+  const previewClient = clients.find(c => String(c.id) === String(selectedClientId));
+  const previewSubject = previewClient ? mergeVars(customSubject, previewClient) : customSubject;
+  const previewBody = previewClient ? mergeVars(customBody, previewClient) : customBody;
+
+  // BCC class recipients
+  const selectedClass = classInstances.find(ci => String(ci.id) === String(selectedClassId));
+  const classEnrolled = selectedClass ? clients.filter(c => selectedClass.enrolledIds.includes(c.id)) : [];
+  const classTmpl = selectedClass ? classTemplates.find(t => t.id === selectedClass.templateId) : null;
+
+  const doSend = () => {
+    const recipients = sendMode === "class"
+      ? classEnrolled.map(c => c.email).filter(Boolean)
+      : previewClient ? [previewClient.email] : [];
+    if (recipients.length === 0) return;
+    const logEntry = {
+      id: Date.now(),
+      date: today,
+      time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+      mode: sendMode,
+      recipients,
+      subject: sendMode === "class" ? customSubject : previewSubject,
+      preview: sendMode === "class"
+        ? `BCC to ${recipients.length} class participants`
+        : `To: ${previewClient?.name} <${previewClient?.email}>`,
+    };
+    setSentLog(l => [logEntry, ...l]);
+    setSent(true);
+    setTimeout(() => setSent(false), 3000);
+  };
+
+  // ── Template CRUD ──────────────────────────────────────────────────────────
+  const saveTmpl = () => {
+    if (!tmplForm.name || !tmplForm.subject) return;
+    if (editTmpl) setEmailTemplates(ts => ts.map(t => t.id === editTmpl.id ? { ...tmplForm, id: editTmpl.id } : t));
+    else setEmailTemplates(ts => [...ts, { ...tmplForm, id: Date.now() }]);
+    setShowTmplModal(false);
+  };
+
+  const VARS_HELP = ["{{clientName}}", "{{dogName}}", "{{trainerName}}", "{{sessionDate}}", "{{sessionTime}}", "{{sessionLocation}}", "{{className}}", "{{startDate}}", "{{classTime}}", "{{sessionDates}}", "{{homeworkList}}"];
+
+  return (
+    <div>
+      <h1 style={{ fontFamily: "Georgia, serif", fontSize: 26, color: C.obsidian, marginBottom: 20 }}>Emails</h1>
+
+      {/* Tabs */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+        {[["send", "✉ Send Email"], ["templates", "📝 Templates"], ["log", "📋 Sent Log"]].map(([t, l]) => (
+          <button key={t} onClick={() => setTab(t)} style={{ padding: "8px 20px", borderRadius: 20, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: tab === t ? C.obsidian : C.fog, color: tab === t ? C.cream : C.charcoal }}>{l}</button>
+        ))}
+      </div>
+
+      {/* ── SEND TAB ──────────────────────────────────────────────────────────── */}
+      {tab === "send" && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, alignItems: "start" }}>
+
+          {/* Left: compose */}
+          <div style={{ display: "grid", gap: 14 }}>
+            <Card>
+              <h3 style={{ fontFamily: "Georgia, serif", margin: "0 0 14px" }}>Compose</h3>
+
+              {/* Individual vs Class toggle */}
+              <div style={{ display: "flex", gap: 0, marginBottom: 16, background: C.cream, borderRadius: 10, padding: 4 }}>
+                {[["individual", "Individual Client"], ["class", "Entire Class (BCC)"]].map(([m, l]) => (
+                  <button key={m} onClick={() => { setSendMode(m); setSent(false); }} style={{ flex: 1, padding: "8px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 12, fontFamily: "inherit", background: sendMode === m ? C.gold : "transparent", color: sendMode === m ? C.obsidian : C.silver, transition: "all 0.15s" }}>{l}</button>
+                ))}
+              </div>
+
+              {sendMode === "individual" && (
+                <Field label="Recipient" style={{ marginBottom: 12 }}>
+                  <select style={inputStyle} value={selectedClientId} onChange={e => setSelectedClientId(e.target.value)}>
+                    <option value="">Choose a client…</option>
+                    {clients.map(c => <option key={c.id} value={c.id}>{c.name} — {c.email}</option>)}
+                  </select>
+                </Field>
+              )}
+
+              {sendMode === "class" && (
+                <Field label="Class" style={{ marginBottom: 12 }}>
+                  <select style={inputStyle} value={selectedClassId} onChange={e => setSelectedClassId(e.target.value)}>
+                    <option value="">Choose a class…</option>
+                    {classInstances.map(ci => {
+                      const t = classTemplates.find(t => t.id === ci.templateId);
+                      return <option key={ci.id} value={ci.id}>{t?.name} — starts {fmtDate(ci.startDate)} ({(ci.enrolledIds?.length || 0)} enrolled)</option>;
+                    })}
+                  </select>
+                  {selectedClass && (
+                    <div style={{ marginTop: 6, fontSize: 12, color: C.steel }}>
+                      BCC: {classEnrolled.map(c => c.email).filter(Boolean).join(", ") || "No emails on file"}
+                    </div>
+                  )}
+                </Field>
+              )}
+
+              <Field label="Start from template (optional)" style={{ marginBottom: 12 }}>
+                <select style={inputStyle} value={selectedTemplateId} onChange={e => pickTemplate(e.target.value)}>
+                  <option value="">Blank email…</option>
+                  {emailTemplates.filter(t => t.active).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </Field>
+
+              <div style={{ fontSize: 11, color: C.silver, marginBottom: 8 }}>
+                From: <b style={{ color: C.steel }}>{fromEmail}</b>
+              </div>
+
+              <Field label="Subject" style={{ marginBottom: 10 }}>
+                <input style={inputStyle} value={customSubject} onChange={e => setCustomSubject(e.target.value)} placeholder="Email subject…" />
+              </Field>
+              <Field label="Body">
+                <textarea style={{ ...inputStyle, minHeight: 200, resize: "vertical" }} value={customBody} onChange={e => setCustomBody(e.target.value)} placeholder="Write your email…" />
+              </Field>
+
+              <div style={{ marginTop: 10, display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                {sent && <span style={{ color: C.sage, fontWeight: 700, fontSize: 13, alignSelf: "center" }}>✓ Sent!</span>}
+                <Btn variant="sage" disabled={(!selectedClientId && sendMode === "individual") || (!selectedClassId && sendMode === "class") || !customSubject || !customBody} onClick={doSend}>
+                  {sendMode === "class" ? `📧 Send BCC to ${classEnrolled.length} clients` : "📧 Send Email"}
+                </Btn>
+              </div>
+            </Card>
+
+            {/* Variable reference */}
+            <Card style={{ padding: "14px 18px" }}>
+              <div style={{ fontWeight: 800, fontSize: 12, color: C.silver, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 8 }}>Merge Variables</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {VARS_HELP.map(v => (
+                  <span key={v} onClick={() => setCustomBody(b => b + v)} style={{ background: C.cream, borderRadius: 6, padding: "3px 8px", fontSize: 11, fontFamily: "monospace", color: C.sky, cursor: "pointer", border: `1px solid ${C.fog}` }} title="Click to insert">{v}</span>
+                ))}
+              </div>
+              <div style={{ fontSize: 11, color: C.silver, marginTop: 8 }}>Click any variable to insert it at the end of your message.</div>
+            </Card>
+          </div>
+
+          {/* Right: live preview */}
+          <div style={{ display: "grid", gap: 14 }}>
+            <Card>
+              <div style={{ fontWeight: 800, fontSize: 13, color: C.silver, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 12 }}>Preview</div>
+              <div style={{ fontSize: 12, color: C.steel, marginBottom: 4 }}>
+                <b>From:</b> {fromEmail}<br />
+                <b>To:</b> {sendMode === "class" ? `[BCC: ${classEnrolled.length} recipients]` : (previewClient ? `${previewClient.name} <${previewClient.email}>` : "—")}
+              </div>
+              <div style={{ borderTop: `1px solid ${C.fog}`, paddingTop: 12, marginTop: 8 }}>
+                <div style={{ fontWeight: 800, fontSize: 14, color: C.obsidian, marginBottom: 10 }}>{previewSubject || <span style={{ color: C.silver, fontStyle: "italic" }}>Subject line will appear here</span>}</div>
+                <div style={{ fontSize: 13, color: C.steel, lineHeight: 1.8, whiteSpace: "pre-wrap" }}>{previewBody || <span style={{ color: C.silver, fontStyle: "italic" }}>Email body will appear here. Select a client above to preview merged variables.</span>}</div>
+              </div>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* ── TEMPLATES TAB ─────────────────────────────────────────────────────── */}
+      {tab === "templates" && (
+        <div>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
+            <Btn onClick={() => { setEditTmpl(null); setTmplForm({ name: "", subject: "", body: "", active: true }); setShowTmplModal(true); }}>+ New Template</Btn>
+          </div>
+          <div style={{ display: "grid", gap: 12 }}>
+            {emailTemplates.map(t => (
+              <Card key={t.id} style={{ borderLeft: `4px solid ${t.active ? C.gold : C.silver}` }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
+                      <span style={{ fontWeight: 800, fontSize: 14, color: C.obsidian }}>{t.name}</span>
+                      <Pill color={t.active ? C.sage : C.silver}>{t.active ? "Active" : "Inactive"}</Pill>
+                    </div>
+                    <div style={{ fontSize: 13, color: C.steel, marginBottom: 6 }}>Subject: <b>{t.subject}</b></div>
+                    <div style={{ fontSize: 12, color: C.silver, lineHeight: 1.5, maxHeight: 52, overflow: "hidden" }}>{t.body.slice(0, 140)}{t.body.length > 140 ? "…" : ""}</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                    <Btn small variant="ghost" onClick={() => { setEditTmpl(t); setTmplForm({ ...t }); setShowTmplModal(true); }}>Edit</Btn>
+                    <Btn small variant={t.active ? "danger" : "sage"} onClick={() => setEmailTemplates(ts => ts.map(x => x.id === t.id ? { ...x, active: !x.active } : x))}>{t.active ? "Disable" : "Enable"}</Btn>
+                    <Btn small variant="ghost" onClick={() => { pickTemplate(String(t.id)); setTab("send"); }}>Use →</Btn>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+
+          {showTmplModal && (
+            <Modal title={editTmpl ? "Edit Template" : "New Template"} onClose={() => setShowTmplModal(false)} wide>
+              <div style={{ display: "grid", gap: 14 }}>
+                <Input label="Template Name" value={tmplForm.name} onChange={e => setTmplForm(f => ({ ...f, name: e.target.value }))} placeholder="Session Confirmation, Homework Follow-Up…" />
+                <Input label="Subject" value={tmplForm.subject} onChange={e => setTmplForm(f => ({ ...f, subject: e.target.value }))} />
+                <Field label="Body" hint="Use merge variables like {{clientName}}, {{sessionDate}}, etc.">
+                  <textarea style={{ ...inputStyle, minHeight: 220, resize: "vertical" }} value={tmplForm.body} onChange={e => setTmplForm(f => ({ ...f, body: e.target.value }))} />
+                </Field>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {VARS_HELP.map(v => (
+                    <span key={v} onClick={() => setTmplForm(f => ({ ...f, body: f.body + v }))} style={{ background: C.cream, borderRadius: 6, padding: "3px 8px", fontSize: 11, fontFamily: "monospace", color: C.sky, cursor: "pointer", border: `1px solid ${C.fog}` }}>{v}</span>
+                  ))}
+                </div>
+                <label style={{ display: "flex", gap: 8, alignItems: "center", cursor: "pointer", fontSize: 14 }}>
+                  <input type="checkbox" checked={tmplForm.active} onChange={e => setTmplForm(f => ({ ...f, active: e.target.checked }))} />
+                  Active (available to use in Send tab)
+                </label>
+                <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                  <Btn variant="ghost" onClick={() => setShowTmplModal(false)}>Cancel</Btn>
+                  <Btn onClick={saveTmpl}>Save Template</Btn>
+                </div>
+              </div>
+            </Modal>
+          )}
+        </div>
+      )}
+
+      {/* ── SENT LOG TAB ──────────────────────────────────────────────────────── */}
+      {tab === "log" && (
+        <div>
+          {sentLog.length === 0
+            ? <div style={{ textAlign: "center", padding: "48px 20px", color: C.silver }}>
+                <div style={{ fontSize: 48, marginBottom: 12 }}>📭</div>
+                <div>No emails sent yet this session.</div>
+              </div>
+            : <div style={{ display: "grid", gap: 10 }}>
+                {sentLog.map(log => (
+                  <Card key={log.id} style={{ borderLeft: `4px solid ${C.sage}` }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: 14, color: C.obsidian, marginBottom: 2 }}>{log.subject}</div>
+                        <div style={{ fontSize: 13, color: C.steel }}>{log.preview}</div>
+                      </div>
+                      <div style={{ fontSize: 12, color: C.silver, whiteSpace: "nowrap" }}>{fmtDate(log.date)} · {log.time}</div>
+                    </div>
+                  </Card>
+                ))}
+              </div>}
+          <div style={{ marginTop: 20, background: C.cream, borderRadius: 10, padding: "12px 16px", fontSize: 13, color: C.steel }}>
+            <b>Note:</b> The sent log resets when you refresh the page. Email delivery is handled by SendGrid once your API key is added in Settings.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Reports({ sessions, clients, staff, refunds }) {
   const [period, setPeriod] = useState("all");
   const [customStart, setCustomStart] = useState("");
@@ -2726,11 +3012,11 @@ function SettingsPage({ settings, setSettings }) {
 }
 
 // ─── STAFF PORTAL WRAPPER ─────────────────────────────────────────────────────
-function StaffPortal({ currentUser, onSignOut, staff, setStaff, clients, setClients, sessions, setSessions, classTemplates, setClassTemplates, classInstances, setClassInstances, schedule, setSchedule, oneOffSlots, setOneOffSlots, blockedDates, setBlockedDates, homeworkCards, setHomeworkCards, discountCodes, setDiscountCodes, giftCards, setGiftCards, messages, setMessages, dogNotes, setDogNotes, refunds, settings, setSettings }) {
+function StaffPortal({ currentUser, onSignOut, staff, setStaff, clients, setClients, sessions, setSessions, classTemplates, setClassTemplates, classInstances, setClassInstances, schedule, setSchedule, oneOffSlots, setOneOffSlots, blockedDates, setBlockedDates, homeworkCards, setHomeworkCards, discountCodes, setDiscountCodes, giftCards, setGiftCards, messages, setMessages, dogNotes, setDogNotes, refunds, emailTemplates, setEmailTemplates, settings, setSettings }) {
   const [page, setPage] = useState("dashboard");
   const [navOpen, setNavOpen] = useState(true);
   const nav = currentUser.role === "admin" ? NAV_ADMIN : NAV_TRAINER;
-  const pageProps = { currentUser, staff, setStaff, clients, setClients, sessions, setSessions, classTemplates, setClassTemplates, classInstances, setClassInstances, schedule, setSchedule, oneOffSlots, setOneOffSlots, blockedDates, setBlockedDates, homeworkCards, setHomeworkCards, discountCodes, setDiscountCodes, giftCards, setGiftCards, messages, setMessages, dogNotes, setDogNotes, refunds, settings, setSettings };
+  const pageProps = { currentUser, staff, setStaff, clients, setClients, sessions, setSessions, classTemplates, setClassTemplates, classInstances, setClassInstances, schedule, setSchedule, oneOffSlots, setOneOffSlots, blockedDates, setBlockedDates, homeworkCards, setHomeworkCards, discountCodes, setDiscountCodes, giftCards, setGiftCards, messages, setMessages, dogNotes, setDogNotes, refunds, emailTemplates, setEmailTemplates, settings, setSettings };
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: C.cream, fontFamily: "Georgia, serif" }}>
@@ -2769,6 +3055,7 @@ function StaffPortal({ currentUser, onSignOut, staff, setStaff, clients, setClie
         {page === "homework" && <HomeworkCards {...pageProps} />}
         {page === "staff" && currentUser.role === "admin" && <Staff {...pageProps} />}
         {page === "discounts" && currentUser.role === "admin" && <DiscountsAndGiftCards {...pageProps} />}
+        {page === "emails" && currentUser.role === "admin" && <EmailCenter {...pageProps} />}
         {page === "reports" && currentUser.role === "admin" && <Reports {...pageProps} />}
         {page === "settings" && currentUser.role === "admin" && <SettingsPage {...pageProps} />}
       </main>
@@ -2799,6 +3086,7 @@ export default function App() {
   const [messages, setMessages] = useState(SEED_MESSAGES);
   const [dogNotes, setDogNotes] = useState(SEED_DOG_NOTES);
   const [refunds] = useState(SEED_REFUNDS);
+  const [emailTemplates, setEmailTemplates] = useState(SEED_EMAIL_TEMPLATES);
   const [settings, setSettings] = useState({
     businessName: "Core Canine", phone: "555-CORE", email: "hello@corecanine.com", address: "123 Training Ln",
     logoUrl: "",
@@ -2877,6 +3165,7 @@ export default function App() {
       messages={messages} setMessages={setMessages}
       dogNotes={dogNotes} setDogNotes={setDogNotes}
       refunds={refunds}
+      emailTemplates={emailTemplates} setEmailTemplates={setEmailTemplates}
       settings={settings} setSettings={setSettings}
     />
   );
