@@ -421,12 +421,15 @@ function Onboarding({ client, onComplete }) {
 
 // ─── CLIENT PORTAL SCREENS ────────────────────────────────────────────────────
 function BookSession({ client, discountCodes, giftCards, staffList, schedule, onBack, onBooked }) {
+  const isReturning = !!(client?.name && client?.email && client?.dogs?.length > 0);
   const [step, setStep] = useState(1);
   const [trainer, setTrainer] = useState(null);
   const [sessionType, setSessionType] = useState("facility");
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
   const [notes, setNotes] = useState("");
+  // Intake form state (new clients only)
+  const [intake, setIntake] = useState({ name: client?.name || "", email: client?.email || "", address: "", issues: "", dogs: client?.dogs?.length > 0 ? client.dogs.map(d => ({ id: d.id, name: d.name, breed: d.breed || "", dob: d.birthday || "", weight: "" })) : [{ id: Date.now(), name: "", breed: "", dob: "", weight: "" }] });
   const [discount, setDiscount] = useState("");
   const [discountApplied, setDiscountApplied] = useState(null);
   const [giftCode, setGiftCode] = useState("");
@@ -434,6 +437,11 @@ function BookSession({ client, discountCodes, giftCards, staffList, schedule, on
   const [card, setCard] = useState({ number: "", exp: "", cvc: "", name: "" });
   const [booked, setBooked] = useState(false);
   const BASE = sessionType === "in-home" ? 110 : 90;
+
+  // Steps: 1=Trainer&Type, 2=Date&Time, [3=Intake — new only], 4=Checkout
+  const intakeStep = isReturning ? null : 3;
+  const checkoutStep = isReturning ? 3 : 4;
+  const totalSteps = isReturning ? 3 : 4;
 
   const calcTotal = () => {
     let t = BASE;
@@ -461,6 +469,15 @@ function BookSession({ client, discountCodes, giftCards, staffList, schedule, on
     return schedule[trainer.id]?.[key]?.[dayName] || [];
   };
 
+  const addIntakeDog = () => setIntake(f => ({ ...f, dogs: [...f.dogs, { id: Date.now(), name: "", breed: "", dob: "", weight: "" }] }));
+  const removeIntakeDog = id => setIntake(f => ({ ...f, dogs: f.dogs.filter(d => d.id !== id) }));
+  const updateIntakeDog = (id, field, val) => setIntake(f => ({ ...f, dogs: f.dogs.map(d => d.id === id ? { ...d, [field]: val } : d) }));
+  const intakeValid = () => intake.name && intake.email && intake.dogs.length > 0 && intake.dogs.every(d => d.name);
+
+  const stepLabels = isReturning
+    ? [["1", "Trainer & Type"], ["2", "Date & Time"], ["3", "Checkout"]]
+    : [["1", "Trainer & Type"], ["2", "Date & Time"], ["3", "Your Info"], ["4", "Checkout"]];
+
   if (booked) return (
     <div style={{ maxWidth: 480, margin: "0 auto", textAlign: "center", padding: "40px 20px" }}>
       <div style={{ fontSize: 60, marginBottom: 16 }}>🎉</div>
@@ -474,12 +491,18 @@ function BookSession({ client, discountCodes, giftCards, staffList, schedule, on
     <div style={{ maxWidth: 560, margin: "0 auto" }}>
       <button onClick={onBack} style={{ background: "none", border: "none", color: C.gold, cursor: "pointer", fontWeight: 700, fontSize: 14, marginBottom: 20 }}>← Back</button>
       <h2 style={{ fontFamily: "Georgia, serif", color: C.obsidian, marginBottom: 20 }}>Book a Private Session</h2>
+      {isReturning && (
+        <div style={{ background: C.sage + "18", border: `1px solid ${C.sage}40`, borderRadius: 10, padding: "8px 14px", marginBottom: 16, fontSize: 13, color: C.sage, fontWeight: 700 }}>
+          ✓ Welcome back, {client.name}! We have your info on file.
+        </div>
+      )}
       <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
-        {[["1", "Trainer & Type"], ["2", "Date & Time"], ["3", "Checkout"]].map(([n, l], i) => (
+        {stepLabels.map(([n, l], i) => (
           <Step key={n} number={n} label={l} active={step === i + 1} done={step > i + 1} />
         ))}
       </div>
 
+      {/* Step 1: Trainer & Type */}
       {step === 1 && (
         <div style={{ display: "grid", gap: 16 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -487,7 +510,7 @@ function BookSession({ client, discountCodes, giftCards, staffList, schedule, on
               <div key={v} onClick={() => { setSessionType(v); setSelectedDate(""); setSelectedTime(""); }} style={{ padding: 16, borderRadius: 14, border: `2px solid ${sessionType === v ? C.gold : C.fog}`, background: sessionType === v ? C.gold + "14" : C.white, cursor: "pointer", textAlign: "center", transition: "all 0.15s" }}>
                 <div style={{ fontSize: 28, marginBottom: 6 }}>{icon}</div>
                 <div style={{ fontWeight: 800, color: C.obsidian }}>{label}</div>
-                <div style={{ fontSize: 13, color: C.silver }}>{price} · 60 min</div>
+                <div style={{ fontSize: 13, color: C.silver }}>{price} · 90 min</div>
               </div>
             ))}
           </div>
@@ -508,6 +531,7 @@ function BookSession({ client, discountCodes, giftCards, staffList, schedule, on
         </div>
       )}
 
+      {/* Step 2: Date & Time */}
       {step === 2 && (
         <div style={{ display: "grid", gap: 16 }}>
           <div style={{ fontWeight: 700, color: C.obsidian }}>Select a Date</div>
@@ -531,12 +555,50 @@ function BookSession({ client, discountCodes, giftCards, staffList, schedule, on
           <TextArea label="Notes for your trainer (optional)" placeholder="What would you like to work on?" value={notes} onChange={e => setNotes(e.target.value)} />
           <div style={{ display: "flex", gap: 10 }}>
             <Btn variant="ghost" onClick={() => setStep(1)}>← Back</Btn>
-            <Btn full disabled={!selectedDate || !selectedTime} onClick={() => setStep(3)}>Continue →</Btn>
+            <Btn full disabled={!selectedDate || !selectedTime} onClick={() => setStep(isReturning ? checkoutStep : intakeStep)}>Continue →</Btn>
           </div>
         </div>
       )}
 
-      {step === 3 && (
+      {/* Step 3 (new clients): Intake Form */}
+      {step === intakeStep && !isReturning && (
+        <div style={{ display: "grid", gap: 16 }}>
+          <div style={{ background: C.cream, borderRadius: 10, padding: "10px 14px", fontSize: 13, color: C.steel }}>
+            This helps us prepare for your first session. You only need to fill this out once.
+          </div>
+          <Input label="Full Name *" value={intake.name} onChange={e => setIntake(f => ({ ...f, name: e.target.value }))} />
+          <Input label="Email *" type="email" value={intake.email} onChange={e => setIntake(f => ({ ...f, email: e.target.value }))} />
+          <Input label="Home Address" placeholder="123 Main St, City, State" value={intake.address} onChange={e => setIntake(f => ({ ...f, address: e.target.value }))} />
+          <TextArea label="What issues are you hoping to work on?" placeholder="Leash pulling, jumping, recall, reactivity…" value={intake.issues} onChange={e => setIntake(f => ({ ...f, issues: e.target.value }))} />
+
+          <div style={{ borderTop: `1px solid ${C.fog}`, paddingTop: 14 }}>
+            <div style={{ fontWeight: 800, fontSize: 13, color: C.obsidian, marginBottom: 12 }}>Your Dog(s) *</div>
+            {intake.dogs.map((dog, i) => (
+              <div key={dog.id} style={{ background: C.cream, borderRadius: 12, padding: "14px", marginBottom: 12, position: "relative" }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: C.steel, marginBottom: 10 }}>Dog #{i + 1}</div>
+                {intake.dogs.length > 1 && (
+                  <button onClick={() => removeIntakeDog(dog.id)} style={{ position: "absolute", top: 10, right: 12, background: "none", border: "none", color: C.rust, cursor: "pointer", fontWeight: 800, fontSize: 16 }}>✕</button>
+                )}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <Input label="Name *" value={dog.name} onChange={e => updateIntakeDog(dog.id, "name", e.target.value)} />
+                  <Input label="Breed" value={dog.breed} onChange={e => updateIntakeDog(dog.id, "breed", e.target.value)} />
+                  <Input label="Date of Birth" type="date" value={dog.dob} onChange={e => updateIntakeDog(dog.id, "dob", e.target.value)} />
+                  <Input label="Weight (lbs)" type="number" placeholder="45" value={dog.weight} onChange={e => updateIntakeDog(dog.id, "weight", e.target.value)} />
+                </div>
+              </div>
+            ))}
+            <button onClick={addIntakeDog} style={{ background: "none", border: `1.5px dashed ${C.sky}`, borderRadius: 8, padding: "8px 16px", cursor: "pointer", color: C.sky, fontWeight: 700, fontSize: 13, fontFamily: "inherit" }}>+ Add Another Dog</button>
+          </div>
+
+          <div style={{ display: "flex", gap: 10 }}>
+            <Btn variant="ghost" onClick={() => setStep(2)}>← Back</Btn>
+            <Btn full disabled={!intakeValid()} onClick={() => setStep(checkoutStep)}>Continue →</Btn>
+          </div>
+        </div>
+      )}
+
+      {/* Final step: Checkout */}
+      {step === checkoutStep && (
         <div style={{ display: "grid", gap: 14 }}>
           <Card style={{ background: C.cream, padding: "16px 20px" }}>
             <div style={{ fontWeight: 800, marginBottom: 8 }}>Order Summary</div>
@@ -573,7 +635,7 @@ function BookSession({ client, discountCodes, giftCards, staffList, schedule, on
             </Card>
           )}
           <div style={{ display: "flex", gap: 10 }}>
-            <Btn variant="ghost" onClick={() => setStep(2)}>← Back</Btn>
+            <Btn variant="ghost" onClick={() => setStep(isReturning ? 2 : intakeStep)}>← Back</Btn>
             <Btn full variant="sage" onClick={() => { setBooked(true); onBooked && onBooked({ type: "session", trainer, date: selectedDate, time: selectedTime, sessionType, price: calcTotal() }); }}>Confirm & Pay ${calcTotal().toFixed(2)}</Btn>
           </div>
         </div>
@@ -583,14 +645,21 @@ function BookSession({ client, discountCodes, giftCards, staffList, schedule, on
 }
 
 function BookClass({ client, discountCodes, giftCards, classTemplates, classInstances, staffList, onBack, onBooked }) {
+  const isReturning = !!(client?.name && client?.email && client?.dogs?.length > 0);
   const [selected, setSelected] = useState(null);
   const [step, setStep] = useState(1);
+  // Intake (new clients only) — same as session PLUS vet info + vaccine upload
+  const [intake, setIntake] = useState({ name: client?.name || "", email: client?.email || "", address: "", issues: "", vetName: "", vetPhone: "", dogs: client?.dogs?.length > 0 ? client.dogs.map(d => ({ id: d.id, name: d.name, breed: d.breed || "", dob: d.birthday || "", weight: "", vaccineDoc: null })) : [{ id: Date.now(), name: "", breed: "", dob: "", weight: "", vaccineDoc: null }] });
   const [discount, setDiscount] = useState("");
   const [discountApplied, setDiscountApplied] = useState(null);
   const [giftCode, setGiftCode] = useState("");
   const [giftApplied, setGiftApplied] = useState(null);
   const [card, setCard] = useState({ number: "", exp: "", cvc: "", name: "" });
   const [booked, setBooked] = useState(false);
+  const vaccineRefs = useRef({});
+
+  const intakeStep = isReturning ? null : 2;
+  const checkoutStep = isReturning ? 2 : 3;
 
   const tmpl = selected ? classTemplates.find(t => t.id === selected.templateId) : null;
   const instructor = selected ? staffList.find(s => s.id === selected.instructorId) : null;
@@ -602,6 +671,15 @@ function BookClass({ client, discountCodes, giftCards, classTemplates, classInst
     if (giftApplied) t = Math.max(0, t - giftApplied.balance);
     return Math.max(0, t);
   };
+
+  const addIntakeDog = () => setIntake(f => ({ ...f, dogs: [...f.dogs, { id: Date.now(), name: "", breed: "", dob: "", weight: "", vaccineDoc: null }] }));
+  const removeIntakeDog = id => setIntake(f => ({ ...f, dogs: f.dogs.filter(d => d.id !== id) }));
+  const updateIntakeDog = (id, field, val) => setIntake(f => ({ ...f, dogs: f.dogs.map(d => d.id === id ? { ...d, [field]: val } : d) }));
+  const intakeValid = () => intake.name && intake.email && intake.vetName && intake.vetPhone && intake.dogs.length > 0 && intake.dogs.every(d => d.name && d.vaccineDoc);
+
+  const stepLabels = isReturning
+    ? [["1", "Select Class"], ["2", "Checkout"]]
+    : [["1", "Select Class"], ["2", "Your Info"], ["3", "Checkout"]];
 
   if (booked && selected && tmpl && instructor) return (
     <div style={{ maxWidth: 480, margin: "0 auto", textAlign: "center", padding: "40px 20px" }}>
@@ -622,7 +700,18 @@ function BookClass({ client, discountCodes, giftCards, classTemplates, classInst
     <div style={{ maxWidth: 600, margin: "0 auto" }}>
       <button onClick={onBack} style={{ background: "none", border: "none", color: C.gold, cursor: "pointer", fontWeight: 700, fontSize: 14, marginBottom: 20 }}>← Back</button>
       <h2 style={{ fontFamily: "Georgia, serif", color: C.obsidian, marginBottom: 20 }}>Group Classes</h2>
+      {isReturning && (
+        <div style={{ background: C.sage + "18", border: `1px solid ${C.sage}40`, borderRadius: 10, padding: "8px 14px", marginBottom: 16, fontSize: 13, color: C.sage, fontWeight: 700 }}>
+          ✓ Welcome back, {client.name}! We have your info on file.
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
+        {stepLabels.map(([n, l], i) => (
+          <Step key={n} number={n} label={l} active={step === i + 1} done={step > i + 1} />
+        ))}
+      </div>
 
+      {/* Step 1: Select Class */}
       {step === 1 && (
         <div style={{ display: "grid", gap: 14 }}>
           {classInstances.filter(i => i.startDate >= today).map(inst => {
@@ -653,11 +742,60 @@ function BookClass({ client, discountCodes, giftCards, classTemplates, classInst
               </Card>
             );
           })}
-          <Btn full disabled={!selected} onClick={() => setStep(2)}>Continue →</Btn>
+          <Btn full disabled={!selected} onClick={() => setStep(isReturning ? checkoutStep : intakeStep)}>Continue →</Btn>
         </div>
       )}
 
-      {step === 2 && selected && (() => {
+      {/* Step 2 (new clients only): Group Class Intake */}
+      {step === intakeStep && !isReturning && (
+        <div style={{ display: "grid", gap: 16 }}>
+          <div style={{ background: C.sky + "18", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: C.sky, fontWeight: 700 }}>
+            📋 Group class intake — vaccine records are required for all enrolled dogs.
+          </div>
+          <Input label="Full Name *" value={intake.name} onChange={e => setIntake(f => ({ ...f, name: e.target.value }))} />
+          <Input label="Email *" type="email" value={intake.email} onChange={e => setIntake(f => ({ ...f, email: e.target.value }))} />
+          <Input label="Home Address" value={intake.address} onChange={e => setIntake(f => ({ ...f, address: e.target.value }))} />
+          <TextArea label="What are you hoping your dog will get out of this class?" value={intake.issues} onChange={e => setIntake(f => ({ ...f, issues: e.target.value }))} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Input label="Veterinarian Name *" value={intake.vetName} onChange={e => setIntake(f => ({ ...f, vetName: e.target.value }))} />
+            <Input label="Vet Phone *" value={intake.vetPhone} onChange={e => setIntake(f => ({ ...f, vetPhone: e.target.value }))} />
+          </div>
+
+          <div style={{ borderTop: `1px solid ${C.fog}`, paddingTop: 14 }}>
+            <div style={{ fontWeight: 800, fontSize: 13, color: C.obsidian, marginBottom: 4 }}>Your Dog(s) *</div>
+            <div style={{ fontSize: 12, color: C.silver, marginBottom: 12 }}>Vaccine records required — upload PDF, JPG, or PNG for each dog.</div>
+            {intake.dogs.map((dog, i) => (
+              <div key={dog.id} style={{ background: C.cream, borderRadius: 12, padding: "14px", marginBottom: 12, position: "relative" }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: C.steel, marginBottom: 10 }}>Dog #{i + 1}</div>
+                {intake.dogs.length > 1 && (
+                  <button onClick={() => removeIntakeDog(dog.id)} style={{ position: "absolute", top: 10, right: 12, background: "none", border: "none", color: C.rust, cursor: "pointer", fontWeight: 800, fontSize: 16 }}>✕</button>
+                )}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                  <Input label="Name *" value={dog.name} onChange={e => updateIntakeDog(dog.id, "name", e.target.value)} />
+                  <Input label="Breed" value={dog.breed} onChange={e => updateIntakeDog(dog.id, "breed", e.target.value)} />
+                  <Input label="Date of Birth" type="date" value={dog.dob} onChange={e => updateIntakeDog(dog.id, "dob", e.target.value)} />
+                  <Input label="Weight (lbs)" type="number" value={dog.weight} onChange={e => updateIntakeDog(dog.id, "weight", e.target.value)} />
+                </div>
+                <Field label="Vaccine Records *" hint={dog.vaccineDoc ? "" : "Required for group classes"}>
+                  <input type="file" accept=".pdf,.jpg,.jpeg,.png" ref={el => vaccineRefs.current[dog.id] = el} onChange={e => { const f = e.target.files[0]; if (f) updateIntakeDog(dog.id, "vaccineDoc", { name: f.name }); }} style={{ display: "none" }} />
+                  <button onClick={() => vaccineRefs.current[dog.id]?.click()} style={{ ...inputStyle, cursor: "pointer", textAlign: "left", background: dog.vaccineDoc ? C.sage + "18" : C.white, color: dog.vaccineDoc ? C.sage : C.silver, fontSize: 13, fontFamily: "inherit" }}>
+                    {dog.vaccineDoc ? `✓ ${dog.vaccineDoc.name}` : "📎 Upload vaccine records"}
+                  </button>
+                </Field>
+              </div>
+            ))}
+            <button onClick={addIntakeDog} style={{ background: "none", border: `1.5px dashed ${C.sky}`, borderRadius: 8, padding: "8px 16px", cursor: "pointer", color: C.sky, fontWeight: 700, fontSize: 13, fontFamily: "inherit" }}>+ Add Another Dog</button>
+          </div>
+
+          <div style={{ display: "flex", gap: 10 }}>
+            <Btn variant="ghost" onClick={() => setStep(1)}>← Back</Btn>
+            <Btn full disabled={!intakeValid()} onClick={() => setStep(checkoutStep)}>Continue →</Btn>
+          </div>
+        </div>
+      )}
+
+      {/* Final step: Checkout */}
+      {step === checkoutStep && selected && (() => {
         const full = (tmpl?.maxDogs || 6) - (selected.enrolledIds?.length || selected.enrolledCount || 0) <= 0;
         const dates = Array.from({ length: tmpl?.weeks || 1 }, (_, i) => addWeeks(selected.startDate, i));
         return (
@@ -697,7 +835,7 @@ function BookClass({ client, discountCodes, giftCards, classTemplates, classInst
               </Card>
             )}
             <div style={{ display: "flex", gap: 10 }}>
-              <Btn variant="ghost" onClick={() => setStep(1)}>← Back</Btn>
+              <Btn variant="ghost" onClick={() => setStep(isReturning ? 1 : intakeStep)}>← Back</Btn>
               <Btn full variant="sage" onClick={() => { setBooked(true); onBooked && onBooked({ type: "class", instance: selected }); }}>{full ? "Join Waitlist" : "Enroll & Pay $" + calcTotal().toFixed(2)}</Btn>
             </div>
           </div>
@@ -1737,7 +1875,7 @@ function Classes({ currentUser, staff, clients, classTemplates, setClassTemplate
         <h1 style={{ fontFamily: "Georgia, serif", fontSize: 26, color: C.obsidian, margin: 0 }}>Group Classes</h1>
         <div style={{ display: "flex", gap: 8 }}>
           {currentUser.role === "admin" && <Btn variant="ghost" onClick={() => { setEditTmpl(null); setTmplForm({ name: "", weeks: 4, maxDogs: 6, price: 150, description: "", waitlistEnabled: false }); setShowTmplModal(true); }}>+ Class Template</Btn>}
-          <Btn onClick={() => { setInstForm({ templateId: "", instructorId: String(currentUser.id), startDate: "", time: "" }); setShowInstModal(true); }}>+ Schedule Class</Btn>
+          {currentUser.role === "admin" && <Btn onClick={() => { setInstForm({ templateId: "", instructorId: String(currentUser.id), startDate: "", time: "" }); setShowInstModal(true); }}>+ Schedule Class</Btn>}
         </div>
       </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
