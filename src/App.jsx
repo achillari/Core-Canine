@@ -27,10 +27,11 @@ const SEED_STAFF = [
 ];
 
 const SEED_CLASS_TEMPLATES = [
-  { id: 1, name: "Puppy Kindergarten", weeks: 5, maxDogs: 6, price: 175, description: "Foundation skills & socialization for puppies 8–16 weeks.", waitlistEnabled: true },
+  { id: 1, name: "Puppy Kindergarten", weeks: 5, maxDogs: 6, price: 175, description: "Foundation skills & socialization for puppies 8–16 weeks.", waitlistEnabled: true, freeClass: false },
   { id: 2, name: "Reactive Dog Workshop", weeks: 6, maxDogs: 4, price: 220, description: "Behavior modification for leash-reactive dogs.", waitlistEnabled: true },
   { id: 3, name: "Intermediate Obedience", weeks: 4, maxDogs: 8, price: 150, description: "Real-world reliability for dogs who know the basics.", waitlistEnabled: false },
   { id: 4, name: "Canine Good Citizen Prep", weeks: 4, maxDogs: 6, price: 165, description: "Prepare for the AKC CGC test.", waitlistEnabled: false },
+  { id: 5, name: "Puppy Play Date", weeks: 1, maxDogs: 6, price: 0, description: "Free socialization play date for puppies under 6 months. Drop-in, no experience needed.", waitlistEnabled: true, freeClass: true },
 ];
 
 const SEED_CLASS_INSTANCES = [
@@ -117,6 +118,7 @@ const addWeeks = (ds, w) => { const d = new Date(ds + "T12:00:00"); d.setDate(d.
 const genCode = () => "CORECANINE-" + Math.random().toString(36).slice(2, 7).toUpperCase();
 const today = new Date().toISOString().slice(0, 10);
 const hoursUntil = ds => (new Date(ds + "T12:00:00") - new Date()) / 36e5;
+const hoursUntilDateTime = (ds, ts) => (new Date(ds + "T" + (ts || "12:00") + ":00") - new Date()) / 36e5;
 const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 const TIMES_24 = ["07:00","07:30","08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30"];
 
@@ -922,11 +924,12 @@ function BookClass({ client, discountCodes, giftCards, classTemplates, classInst
   );
 }
 
-function MyBookings({ bookings, setBookings, staffList, schedule }) {
+function MyBookings({ bookings, setBookings, staffList, schedule, classInstances, setClassInstances, classTemplates, client, setPromotionLog }) {
   const [rescheduleItem, setRescheduleItem] = useState(null);
   const [newDate, setNewDate] = useState("");
   const [newTime, setNewTime] = useState("");
   const [showReview, setShowReview] = useState(null);
+  const [promotionNotices, setPromotionNotices] = useState([]);
   const canResched = ds => hoursUntil(ds) > 72;
   const canRefund = ds => hoursUntil(ds) > 72;
   const sessions = bookings.filter(b => b.bookingType === "session");
@@ -937,6 +940,30 @@ function MyBookings({ bookings, setBookings, staffList, schedule }) {
     if (window.confirm(refund ? "Cancel session? You'll receive a full refund." : "Cancel session? Within 72 hours — no refund per cancellation policy.")) {
       setBookings(bs => bs.map(b => b.id === id ? { ...b, status: "cancelled", refunded: refund } : b));
     }
+  };
+
+  const cancelFreeClass = (booking) => {
+    if (!window.confirm("Cancel your spot in " + booking.className + "? Your spot will be given to the next person on the waitlist.")) return;
+    // Remove client from enrolled, promote waitlist
+    if (setClassInstances && client) {
+      setClassInstances(instances => instances.map(inst => {
+        if (inst.id !== booking.instanceId) return inst;
+        const newEnrolled = inst.enrolledIds.filter(id => id !== client.id);
+        const waitlist = inst.waitlist || [];
+        let newWaitlist = [...waitlist];
+        let promoted = null;
+        if (waitlist.length > 0) {
+          promoted = waitlist[0];
+          newEnrolled.push(promoted);
+          newWaitlist = waitlist.slice(1);
+          const noticeId = Date.now();
+          setPromotionNotices(n => [...n, { id: noticeId, clientId: promoted, className: booking.className }]);
+          if (setPromotionLog) setPromotionLog(l => [...l, { id: noticeId, clientId: promoted, className: booking.className, date: booking.startDate, time: booking.time }]);
+        }
+        return { ...inst, enrolledIds: newEnrolled, waitlist: newWaitlist };
+      }));
+    }
+    setBookings(bs => bs.map(b => b.id === booking.id ? { ...b, status: "cancelled" } : b));
   };
 
   return (
@@ -976,21 +1003,45 @@ function MyBookings({ bookings, setBookings, staffList, schedule }) {
           </div>
         </div>
       )}
+      {promotionNotices.length > 0 && promotionNotices.map(n => (
+        <div key={n.id} style={{ background: C.sage + "22", border: `1px solid ${C.sage}`, borderRadius: 12, padding: "12px 16px", marginBottom: 12, fontSize: 14, color: C.sage, fontWeight: 700 }}>
+          🎉 Great news! A spot opened up in <b>{n.className}</b> and you've been moved off the waitlist — you're now enrolled!
+          <button onClick={() => setPromotionNotices(ns => ns.filter(x => x.id !== n.id))} style={{ float: "right", background: "none", border: "none", color: C.sage, cursor: "pointer", fontWeight: 800 }}>✕</button>
+        </div>
+      ))}
       {classes.length > 0 && (
         <div>
           <div style={{ fontSize: 12, fontWeight: 800, color: C.silver, textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Group Classes</div>
           <div style={{ display: "grid", gap: 12 }}>
-            {classes.map(b => (
-              <Card key={b.id} style={{ borderLeft: "4px solid " + C.sage }}>
-                <div style={{ fontWeight: 800, marginBottom: 4 }}>{b.className}</div>
-                <div style={{ fontSize: 13, color: C.silver }}>{b.weeks} sessions · Starts {fmtDate(b.startDate)} · {fmt12(b.time)}</div>
-                <div style={{ fontSize: 13, color: C.gold }}>with {b.trainerName} · ${b.price}</div>
-                {b.waitlisted && <div style={{ marginTop: 8, background: C.sky + "22", borderRadius: 8, padding: "6px 10px", fontSize: 13, color: C.sky }}>On waitlist — we'll text you if a spot opens!</div>}
-                <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 4 }}>
-                  {b.dates?.map(d => <span key={d} style={{ background: d < today ? C.fog : C.cream, borderRadius: 6, padding: "3px 9px", fontSize: 12, color: d < today ? C.silver : C.steel }}>{fmtDateShort(d)}{d < today ? " ✓" : ""}</span>)}
-                </div>
-              </Card>
-            ))}
+            {classes.map(b => {
+              const canCancelFree = b.freeClass && b.status !== "cancelled" && !b.waitlisted && hoursUntilDateTime(b.startDate, b.time) > 1;
+              const tooLateToCancelFree = b.freeClass && b.status !== "cancelled" && !b.waitlisted && hoursUntilDateTime(b.startDate, b.time) <= 1 && hoursUntilDateTime(b.startDate, b.time) > 0;
+              return (
+                <Card key={b.id} style={{ borderLeft: `4px solid ${b.status === "cancelled" ? C.silver : C.sage}` }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 4 }}>
+                        <span style={{ fontWeight: 800 }}>{b.className}</span>
+                        {b.freeClass && <Pill color={C.sage}>Free</Pill>}
+                        {b.status === "cancelled" && <Pill color={C.silver}>Cancelled</Pill>}
+                      </div>
+                      <div style={{ fontSize: 13, color: C.silver }}>{b.weeks === 1 ? fmtDate(b.startDate) : `${b.weeks} sessions · Starts ${fmtDate(b.startDate)}`} · {fmt12(b.time)}</div>
+                      <div style={{ fontSize: 13, color: C.gold }}>with {b.trainerName}{b.price > 0 ? ` · $${b.price}` : " · Free"}</div>
+                      {b.waitlisted && <div style={{ marginTop: 8, background: C.sky + "22", borderRadius: 8, padding: "6px 10px", fontSize: 13, color: C.sky }}>On waitlist — you'll be notified if a spot opens!</div>}
+                      {tooLateToCancelFree && <div style={{ fontSize: 12, color: C.rust, marginTop: 4 }}>⚠ Within 1 hour of class — cancellation unavailable</div>}
+                    </div>
+                    {canCancelFree && (
+                      <Btn small variant="danger" onClick={() => cancelFreeClass(b)}>Cancel Spot</Btn>
+                    )}
+                  </div>
+                  {b.status !== "cancelled" && b.dates?.length > 1 && (
+                    <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      {b.dates?.map(d => <span key={d} style={{ background: d < today ? C.fog : C.cream, borderRadius: 6, padding: "3px 9px", fontSize: 12, color: d < today ? C.silver : C.steel }}>{fmtDateShort(d)}{d < today ? " ✓" : ""}</span>)}
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
           </div>
         </div>
       )}
@@ -1219,11 +1270,11 @@ function ClientHome({ client, classInstances, classTemplates, staffList, setPage
 }
 
 // ─── CLIENT PORTAL WRAPPER ────────────────────────────────────────────────────
-function ClientPortal({ client, setClient, onSignOut, staff, sessions, classTemplates, classInstances, discountCodes, giftCards, messages, setMessages, schedule }) {
+function ClientPortal({ client, setClient, onSignOut, staff, sessions, classTemplates, classInstances, setClassInstances, discountCodes, giftCards, messages, setMessages, schedule, setPromotionLog }) {
   const [page, setPage] = useState("home");
   const [bookings, setBookings] = useState([
     { id: 1, bookingType: "session", trainerId: 1, trainerName: "Core Canine Owner", date: "2026-04-02", time: "10:00", sessionType: "facility", price: 90, status: "confirmed" },
-    { id: 2, bookingType: "class", className: "Puppy Kindergarten", trainerName: "Jessica R.", startDate: "2026-03-26", time: "18:00", weeks: 5, price: 175, status: "confirmed", waitlisted: false, dates: Array.from({ length: 5 }, (_, i) => addWeeks("2026-03-26", i)) },
+    { id: 2, bookingType: "class", instanceId: 1, templateId: 1, className: "Puppy Kindergarten", trainerName: "Jessica R.", startDate: "2026-03-26", time: "18:00", weeks: 5, price: 175, status: "confirmed", waitlisted: false, freeClass: false, dates: Array.from({ length: 5 }, (_, i) => addWeeks("2026-03-26", i)) },
   ]);
 
   const handleBooked = booking => {
@@ -1234,7 +1285,7 @@ function ClientPortal({ client, setClient, onSignOut, staff, sessions, classTemp
       const instructor = staff.find(s => s.id === booking.instance.instructorId);
       const enrolledCount = booking.instance.enrolledIds?.length || booking.instance.enrolledCount || 0;
       const full = (tmpl?.maxDogs || 6) - enrolledCount <= 0;
-      setBookings(bs => [...bs, { id: Date.now(), bookingType: "class", className: tmpl?.name, trainerName: instructor?.name, startDate: booking.instance.startDate, time: booking.instance.time, weeks: tmpl?.weeks, price: tmpl?.price, status: "confirmed", waitlisted: full, dates: Array.from({ length: tmpl?.weeks || 1 }, (_, i) => addWeeks(booking.instance.startDate, i)) }]);
+      setBookings(bs => [...bs, { id: Date.now(), bookingType: "class", instanceId: booking.instance.id, templateId: tmpl?.id, className: tmpl?.name, trainerName: instructor?.name, startDate: booking.instance.startDate, time: booking.instance.time, weeks: tmpl?.weeks, price: tmpl?.price, status: "confirmed", waitlisted: full, freeClass: !!(tmpl?.freeClass), dates: Array.from({ length: tmpl?.weeks || 1 }, (_, i) => addWeeks(booking.instance.startDate, i)) }]);
     }
     setPage("bookings");
   };
@@ -1260,7 +1311,7 @@ function ClientPortal({ client, setClient, onSignOut, staff, sessions, classTemp
         {page === "home" && <ClientHome client={client} classInstances={classInstances} classTemplates={classTemplates} staffList={staff} setPage={setPage} />}
         {page === "book-session" && <BookSession {...sharedProps} onBack={() => setPage("home")} onBooked={handleBooked} />}
         {page === "book-class" && <BookClass {...sharedProps} onBack={() => setPage("home")} onBooked={handleBooked} />}
-        {page === "bookings" && <MyBookings bookings={bookings} setBookings={setBookings} staffList={staff} schedule={schedule} />}
+        {page === "bookings" && <MyBookings bookings={bookings} setBookings={setBookings} staffList={staff} schedule={schedule} classInstances={classInstances} setClassInstances={setClassInstances} classTemplates={classTemplates} client={client} setPromotionLog={setPromotionLog} />}
         {page === "messages" && <ClientMessages client={client} messages={messages} setMessages={setMessages} staffList={staff} />}
         {page === "account" && <MyAccount client={client} setClient={setClient} />}
       </div>
@@ -2008,13 +2059,13 @@ function Sessions({ currentUser, staff, clients, sessions, setSessions, schedule
   );
 }
 
-function Classes({ currentUser, staff, clients, classTemplates, setClassTemplates, classInstances, setClassInstances }) {
+function Classes({ currentUser, staff, clients, classTemplates, setClassTemplates, classInstances, setClassInstances, promotionLog, setPromotionLog }) {
   const [view, setView] = useState("instances");
   const [showTmplModal, setShowTmplModal] = useState(false);
   const [showInstModal, setShowInstModal] = useState(false);
   const [editTmpl, setEditTmpl] = useState(null);
   const [rosterInst, setRosterInst] = useState(null);
-  const [tmplForm, setTmplForm] = useState({ name: "", weeks: 4, maxDogs: 6, price: 150, description: "", waitlistEnabled: false });
+  const [tmplForm, setTmplForm] = useState({ name: "", weeks: 4, maxDogs: 6, price: 150, description: "", waitlistEnabled: false, freeClass: false });
   const [instForm, setInstForm] = useState({ templateId: "", instructorId: String(currentUser.id), startDate: "", time: "" });
 
   const saveTmpl = () => {
@@ -2066,7 +2117,7 @@ function Classes({ currentUser, staff, clients, classTemplates, setClassTemplate
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <h1 style={{ fontFamily: "Georgia, serif", fontSize: 26, color: C.obsidian, margin: 0 }}>Group Classes</h1>
         <div style={{ display: "flex", gap: 8 }}>
-          {currentUser.role === "admin" && <Btn variant="ghost" onClick={() => { setEditTmpl(null); setTmplForm({ name: "", weeks: 4, maxDogs: 6, price: 150, description: "", waitlistEnabled: false }); setShowTmplModal(true); }}>+ Class Template</Btn>}
+          {currentUser.role === "admin" && <Btn variant="ghost" onClick={() => { setEditTmpl(null); setTmplForm({ name: "", weeks: 4, maxDogs: 6, price: 150, description: "", waitlistEnabled: false, freeClass: false }); setShowTmplModal(true); }}>+ Class Template</Btn>}
           {currentUser.role === "admin" && <Btn onClick={() => { setInstForm({ templateId: "", instructorId: String(currentUser.id), startDate: "", time: "" }); setShowInstModal(true); }}>+ Schedule Class</Btn>}
         </div>
       </div>
@@ -2085,6 +2136,7 @@ function Classes({ currentUser, staff, clients, classTemplates, setClassTemplate
                 <div style={{ fontSize: 13, color: C.silver, marginTop: 2 }}>{t.weeks} weeks · {t.maxDogs} dogs max · ${t.price}</div>
                 <div style={{ fontSize: 13, color: C.steel, marginTop: 4, fontStyle: "italic" }}>{t.description}</div>
                 {t.waitlistEnabled && <Pill color={C.sky} style={{ marginTop: 6 }}>Waitlist On</Pill>}
+                {t.freeClass && <Pill color={C.sage} style={{ marginTop: 6 }}>Free · Auto-Promote</Pill>}
               </div>
               {currentUser.role === "admin" && (
                 <div style={{ display: "flex", gap: 8 }}>
@@ -2130,6 +2182,32 @@ function Classes({ currentUser, staff, clients, classTemplates, setClassTemplate
           })}
           {myInstances.length === 0 && <p style={{ color: C.silver }}>No classes scheduled yet.</p>}
         </div>
+        {promotionLog && promotionLog.length > 0 && (
+          <div style={{ marginTop: 24 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: C.silver, textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>🔔 Waitlist Promotions — Action Needed</div>
+            <div style={{ display: "grid", gap: 8 }}>
+              {promotionLog.map(entry => {
+                const client = clients.find(c => c.id === entry.clientId);
+                return (
+                  <div key={entry.id} style={{ background: C.sage + "18", border: `1px solid ${C.sage}`, borderRadius: 10, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: C.obsidian }}>
+                        🎉 {client?.name || "A client"} was promoted off the waitlist
+                      </div>
+                      <div style={{ fontSize: 13, color: C.steel, marginTop: 2 }}>
+                        {entry.className} · {fmtDate(entry.date)} at {entry.time ? fmt12(entry.time) : ""}
+                      </div>
+                      <div style={{ fontSize: 12, color: C.silver, marginTop: 2 }}>
+                        📞 {client?.phone} · 📧 {client?.email}
+                      </div>
+                    </div>
+                    <Btn small variant="sage" onClick={() => setPromotionLog(l => l.filter(e => e.id !== entry.id))}>✓ Notified</Btn>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       )}
 
       {rosterInst && (() => {
@@ -2176,6 +2254,10 @@ function Classes({ currentUser, staff, clients, classTemplates, setClassTemplate
             <label style={{ display: "flex", gap: 8, alignItems: "center", cursor: "pointer", fontSize: 14, color: C.obsidian }}>
               <input type="checkbox" checked={tmplForm.waitlistEnabled} onChange={e => setTmplForm(f => ({ ...f, waitlistEnabled: e.target.checked }))} />
               Enable Waitlist for this class
+            </label>
+            <label style={{ display: "flex", gap: 8, alignItems: "center", cursor: "pointer", fontSize: 14, color: C.obsidian }}>
+              <input type="checkbox" checked={tmplForm.freeClass || false} onChange={e => setTmplForm(f => ({ ...f, freeClass: e.target.checked }))} />
+              Free class — clients can cancel up to 1 hour before (waitlist auto-promoted)
             </label>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <Btn variant="ghost" onClick={() => setShowTmplModal(false)}>Cancel</Btn>
@@ -3196,11 +3278,11 @@ function SettingsPage({ settings, setSettings }) {
 }
 
 // ─── STAFF PORTAL WRAPPER ─────────────────────────────────────────────────────
-function StaffPortal({ currentUser, onSignOut, staff, setStaff, clients, setClients, sessions, setSessions, classTemplates, setClassTemplates, classInstances, setClassInstances, schedule, setSchedule, oneOffSlots, setOneOffSlots, blockedDates, setBlockedDates, homeworkCards, setHomeworkCards, discountCodes, setDiscountCodes, giftCards, setGiftCards, messages, setMessages, dogNotes, setDogNotes, refunds, emailTemplates, setEmailTemplates, settings, setSettings }) {
+function StaffPortal({ currentUser, onSignOut, staff, setStaff, clients, setClients, sessions, setSessions, classTemplates, setClassTemplates, classInstances, setClassInstances, schedule, setSchedule, oneOffSlots, setOneOffSlots, blockedDates, setBlockedDates, homeworkCards, setHomeworkCards, discountCodes, setDiscountCodes, giftCards, setGiftCards, messages, setMessages, dogNotes, setDogNotes, refunds, emailTemplates, setEmailTemplates, settings, setSettings, promotionLog, setPromotionLog }) {
   const [page, setPage] = useState("dashboard");
   const [navOpen, setNavOpen] = useState(true);
   const nav = currentUser.role === "admin" ? NAV_ADMIN : NAV_TRAINER;
-  const pageProps = { currentUser, staff, setStaff, clients, setClients, sessions, setSessions, classTemplates, setClassTemplates, classInstances, setClassInstances, schedule, setSchedule, oneOffSlots, setOneOffSlots, blockedDates, setBlockedDates, homeworkCards, setHomeworkCards, discountCodes, setDiscountCodes, giftCards, setGiftCards, messages, setMessages, dogNotes, setDogNotes, refunds, emailTemplates, setEmailTemplates, settings, setSettings };
+  const pageProps = { currentUser, staff, setStaff, clients, setClients, sessions, setSessions, classTemplates, setClassTemplates, classInstances, setClassInstances, schedule, setSchedule, oneOffSlots, setOneOffSlots, blockedDates, setBlockedDates, homeworkCards, setHomeworkCards, discountCodes, setDiscountCodes, giftCards, setGiftCards, messages, setMessages, dogNotes, setDogNotes, refunds, emailTemplates, setEmailTemplates, settings, setSettings, promotionLog, setPromotionLog };
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: C.cream, fontFamily: "Georgia, serif" }}>
@@ -3261,6 +3343,7 @@ export default function App() {
   const [sessions, setSessions] = useState(SEED_SESSIONS);
   const [classTemplates, setClassTemplates] = useState(SEED_CLASS_TEMPLATES);
   const [classInstances, setClassInstances] = useState(SEED_CLASS_INSTANCES);
+  const [promotionLog, setPromotionLog] = useState([]);
   const [schedule, setSchedule] = useState(SEED_SCHEDULE);
   const [oneOffSlots, setOneOffSlots] = useState([]);
   const [blockedDates, setBlockedDates] = useState([]);
@@ -3321,11 +3404,13 @@ export default function App() {
         sessions={sessions}
         classTemplates={classTemplates}
         classInstances={classInstances}
+        setClassInstances={setClassInstances}
         discountCodes={discountCodes}
         giftCards={giftCards}
         messages={messages}
         setMessages={setMessages}
         schedule={schedule}
+        setPromotionLog={setPromotionLog}
       />
     );
   }
@@ -3348,6 +3433,7 @@ export default function App() {
       giftCards={giftCards} setGiftCards={setGiftCards}
       messages={messages} setMessages={setMessages}
       dogNotes={dogNotes} setDogNotes={setDogNotes}
+      promotionLog={promotionLog} setPromotionLog={setPromotionLog}
       refunds={refunds}
       emailTemplates={emailTemplates} setEmailTemplates={setEmailTemplates}
       settings={settings} setSettings={setSettings}
