@@ -2278,7 +2278,7 @@ function Sessions({ currentUser, staff, clients, setClients, sessions, setSessio
   );
 }
 
-function Classes({ currentUser, staff, clients, setClients, classTemplates, setClassTemplates, classInstances, setClassInstances, promotionLog, setPromotionLog }) {
+function Classes({ currentUser, staff, clients, setClients, classTemplates, setClassTemplates, classInstances, setClassInstances, promotionLog, setPromotionLog, emailTemplates, settings }) {
   const [view, setView] = useState("instances");
   const [showTmplModal, setShowTmplModal] = useState(false);
   const [showInstModal, setShowInstModal] = useState(false);
@@ -2357,7 +2357,22 @@ function Classes({ currentUser, staff, clients, setClients, classTemplates, setC
     win.document.close();
   };
 
-  const myInstances = classInstances.filter(i => currentUser.role === "admin" || i.instructorId === currentUser.id);
+  const [instFilter, setInstFilter] = useState("upcoming");
+  const [emailInst, setEmailInst] = useState(null); // instance to email
+  const [emailTmplId, setEmailTmplId] = useState("");
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [emailSent, setEmailSent] = useState(false);
+
+  const allMyInstances = classInstances.filter(i => currentUser.role === "admin" || i.instructorId === currentUser.id);
+  const myInstances = allMyInstances.filter(inst => {
+    const endDate = inst.meetingDates?.length > 0
+      ? inst.meetingDates[inst.meetingDates.length - 1]
+      : inst.startDate;
+    if (instFilter === "upcoming") return endDate >= today;
+    if (instFilter === "past") return endDate < today;
+    return true;
+  });
 
   return (
     <div>
@@ -2398,6 +2413,11 @@ function Classes({ currentUser, staff, clients, setClients, classTemplates, setC
 
       {view === "instances" && (
         <>
+        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+          {[["upcoming", "Upcoming"], ["past", "Past"], ["all", "All"]].map(([v, label]) => (
+            <button key={v} onClick={() => setInstFilter(v)} style={{ padding: "6px 16px", borderRadius: 20, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 12, background: instFilter === v ? C.obsidian : C.fog, color: instFilter === v ? C.cream : C.charcoal }}>{label}</button>
+          ))}
+        </div>
         <div style={{ display: "grid", gap: 16 }}>
           {myInstances.map(inst => {
             const tmpl = classTemplates.find(t => t.id === inst.templateId);
@@ -2429,6 +2449,7 @@ function Classes({ currentUser, staff, clients, setClients, classTemplates, setC
                   </div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <Btn small variant="sage" onClick={() => setRosterInst(inst)}>👥 Roster</Btn>
+                    <Btn small variant="sky" onClick={() => setEmailInst(inst)}>📧 Email Class</Btn>
                     <Btn small variant="ghost" onClick={() => { setEditInst(inst); setInstForm({ templateId: String(inst.templateId), instructorId: String(inst.instructorId), startDate: inst.startDate, time: inst.time, duration: inst.duration || 60, note: inst.note || "", skipDates: inst.skipDates || [] }); setShowInstModal(true); }}>✏️ Edit</Btn>
                     <Btn small variant="dark" onClick={() => printRoster(inst)}>🖨️ Print</Btn>
                   </div>
@@ -2436,7 +2457,7 @@ function Classes({ currentUser, staff, clients, setClients, classTemplates, setC
               </Card>
             );
           })}
-          {myInstances.length === 0 && <p style={{ color: C.silver }}>No classes scheduled yet.</p>}
+          {myInstances.length === 0 && <p style={{ color: C.silver }}>{instFilter === "past" ? "No past classes found." : instFilter === "upcoming" ? "No upcoming classes scheduled." : "No classes found."}</p>}
         </div>
         {promotionLog && promotionLog.length > 0 && (
           <div style={{ marginTop: 24 }}>
@@ -2509,6 +2530,87 @@ function Classes({ currentUser, staff, clients, setClients, classTemplates, setC
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <Btn variant="dark" onClick={() => printRoster(rosterInst)}>🖨️ Print Roster</Btn>
               <Btn variant="ghost" onClick={() => setRosterInst(null)}>Close</Btn>
+            </div>
+          </Modal>
+        );
+      })()}
+
+      {emailInst && (() => {
+        const classTmpl = classTemplates.find(t => t.id === emailInst.templateId);
+        const instructor = staff.find(s => s.id === emailInst.instructorId);
+        const enrolled = clients.filter(c => emailInst.enrolledIds.includes(c.id));
+        const emails = enrolled.map(c => c.email).filter(Boolean);
+        const activeTemplates = (emailTemplates || []).filter(t => t.active);
+
+        const mergeForClient = (text, client) => {
+          if (!text || !client) return text || "";
+          const dog = client.dogs?.[0];
+          const dates = emailInst.meetingDates?.length
+            ? emailInst.meetingDates.map(d => `• ${fmtDate(d)} at ${fmt12(emailInst.time)}`).join("\n")
+            : `• ${fmtDate(emailInst.startDate)} at ${fmt12(emailInst.time)}`;
+          return text
+            .replace(/{{clientName}}/g, client.name || "")
+            .replace(/{{dogName}}/g, dog?.name || "your dog")
+            .replace(/{{trainerName}}/g, instructor?.name || currentUser.name || "")
+            .replace(/{{className}}/g, classTmpl?.name || "")
+            .replace(/{{startDate}}/g, fmtDate(emailInst.startDate))
+            .replace(/{{classTime}}/g, fmt12(emailInst.time))
+            .replace(/{{sessionDates}}/g, dates)
+            .replace(/{{sessionDate}}/g, fmtDate(emailInst.startDate))
+            .replace(/{{sessionTime}}/g, fmt12(emailInst.time))
+            .replace(/{{sessionLocation}}/g, "Core Canine Training Facility")
+            .replace(/{{homeworkList}}/g, "[Homework exercises listed here]");
+        };
+
+        const selectTmpl = (id) => {
+          setEmailTmplId(id);
+          const t = activeTemplates.find(t => String(t.id) === String(id));
+          if (t) { setEmailSubject(t.subject); setEmailBody(t.body); }
+          else { setEmailSubject(""); setEmailBody(""); }
+        };
+
+        const previewBody = enrolled.length > 0 ? mergeForClient(emailBody, enrolled[0]) : emailBody;
+        const previewSubject = enrolled.length > 0 ? mergeForClient(emailSubject, enrolled[0]) : emailSubject;
+
+        const doSend = () => {
+          if (!emailSubject || !emailBody || emails.length === 0) return;
+          window.location.href = `mailto:${emails[0]}?bcc=${emails.slice(1).join(",")}&subject=${encodeURIComponent(previewSubject)}&body=${encodeURIComponent(previewBody)}`;
+          setEmailSent(true);
+          setTimeout(() => setEmailSent(false), 3000);
+        };
+
+        return (
+          <Modal wide title={`Email ${classTmpl?.name}`} onClose={() => { setEmailInst(null); setEmailTmplId(""); setEmailSubject(""); setEmailBody(""); setEmailSent(false); }}>
+            <div style={{ display: "grid", gap: 16 }}>
+              <div style={{ background: C.cream, borderRadius: 10, padding: "12px 16px" }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: C.silver, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>Recipients ({enrolled.length})</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {enrolled.length > 0
+                    ? enrolled.map(c => <span key={c.id} style={{ background: C.white, border: `1px solid ${C.fog}`, borderRadius: 20, padding: "3px 10px", fontSize: 12, fontWeight: 600, color: C.charcoal }}>{c.name} · {c.email}</span>)
+                    : <span style={{ fontSize: 13, color: C.silver }}>No enrolled clients</span>}
+                </div>
+              </div>
+              <Sel label="Email Template" value={emailTmplId} onChange={e => selectTmpl(e.target.value)}>
+                <option value="">— Select a template —</option>
+                {activeTemplates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </Sel>
+              {emailTmplId && <>
+                <Input label="Subject" value={emailSubject} onChange={e => setEmailSubject(e.target.value)} />
+                <TextArea label="Body" value={emailBody} onChange={e => setEmailBody(e.target.value)} style={{ minHeight: 160 }} />
+                {enrolled.length > 0 && (
+                  <div style={{ background: C.cream, borderRadius: 10, padding: "14px 16px" }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: C.silver, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Preview — merged for {enrolled[0].name}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: C.obsidian, marginBottom: 4 }}>Subject: {previewSubject}</div>
+                    <div style={{ fontSize: 13, color: C.steel, whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{previewBody}</div>
+                  </div>
+                )}
+              </>}
+              {emailSent && <div style={{ background: C.sage + "22", border: `1px solid ${C.sage}`, borderRadius: 10, padding: "10px 14px", fontSize: 13, color: C.sage, fontWeight: 700 }}>✓ Email client opened!</div>}
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                <Btn variant="ghost" onClick={() => { setEmailInst(null); setEmailTmplId(""); setEmailSubject(""); setEmailBody(""); }}>Close</Btn>
+                <Btn variant="dark" onClick={() => navigator.clipboard.writeText(emails.join(", "))}>📋 Copy Emails</Btn>
+                <Btn variant="sky" disabled={!emailTmplId || emails.length === 0} onClick={doSend}>📧 Send Email</Btn>
+              </div>
             </div>
           </Modal>
         );
