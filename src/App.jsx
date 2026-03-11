@@ -40,13 +40,13 @@ const SEED_CLASS_INSTANCES = [
 ];
 
 const SEED_CLIENTS = [
-  { id: 1, name: "Sarah Mitchell", phone: "555-1001", email: "sarah@email.com", joinDate: "2025-11-01", waiverSigned: true,
+  { id: 1, name: "Sarah Mitchell", phone: "555-1001", email: "sarah@email.com", address: "42 Maple St, Springfield, VA 22150", joinDate: "2025-11-01", waiverSigned: true,
     dogs: [{ id: 1, name: "Biscuit", breed: "Golden Retriever", age: 3, sex: "Male", neutered: true, photo: null, notes: "Leash reactive. Great recall off-leash.", birthday: "2022-06-15", docs: [] }] },
-  { id: 2, name: "James Lee", phone: "555-1002", email: "jlee@email.com", joinDate: "2026-01-15", waiverSigned: true,
+  { id: 2, name: "James Lee", phone: "555-1002", email: "jlee@email.com", address: "88 Oak Run Dr, Alexandria, VA 22304", joinDate: "2026-01-15", waiverSigned: true,
     dogs: [{ id: 2, name: "Mochi", breed: "Shiba Inu", age: 1, sex: "Female", neutered: false, photo: null, notes: "Puppy — high energy, short attention span.", birthday: "2025-02-10", docs: [] }] },
-  { id: 3, name: "Donna Reyes", phone: "555-1003", email: "donna@email.com", joinDate: "2025-08-20", waiverSigned: true,
+  { id: 3, name: "Donna Reyes", phone: "555-1003", email: "donna@email.com", address: "17 Cedar Lane, Burke, VA 22015", joinDate: "2025-08-20", waiverSigned: true,
     dogs: [{ id: 3, name: "Atlas", breed: "German Shepherd", age: 4, sex: "Male", neutered: true, photo: null, notes: "Advanced skills. Competition goals.", birthday: "2021-11-03", docs: [] }] },
-  { id: 4, name: "Kevin Park", phone: "555-1004", email: "kevin@email.com", joinDate: "2026-02-01", waiverSigned: false,
+  { id: 4, name: "Kevin Park", phone: "555-1004", email: "kevin@email.com", address: "305 Birchwood Ave, Fairfax, VA 22030", joinDate: "2026-02-01", waiverSigned: false,
     dogs: [{ id: 4, name: "Noodle", breed: "Labradoodle", age: 2, sex: "Male", neutered: true, photo: null, notes: "Jumps on guests. Needs impulse control.", birthday: "2023-09-22", docs: [] }] },
 ];
 
@@ -1510,7 +1510,10 @@ function CalendarView({ currentUser, staff, clients, sessions, classInstances, c
         key: `s-${s.id}`, time: s.time, label: client?.name || "Session",
         sub: isAdmin ? `${trainer?.firstName || trainer?.name} · ${st.label}` : st.label,
         color: st.location === "facility" ? C.sage : C.gold, kind: "session",
-        clientId: s.clientId
+        clientId: s.clientId,
+        isInHome: st.location === "in-home",
+        address: client?.address || "",
+        phone: client?.phone || ""
       });
     });
     classInstances.filter(ci => {
@@ -1556,6 +1559,8 @@ function CalendarView({ currentUser, staff, clients, sessions, classInstances, c
           {ev.kind !== "block" && <span style={{ opacity: 0.8 }}>{fmt12(ev.time)} </span>}{ev.label}{clickable && !compact ? <span style={{ opacity: 0.5, fontSize: 9 }}> ›</span> : ""}
         </div>
         {!compact && ev.sub && <div style={{ fontSize: 10, color: C.steel, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ev.sub}</div>}
+      {!compact && ev.isInHome && ev.address && <div style={{ fontSize: 10, color: C.gold, fontWeight: 700, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>📍 {ev.address}</div>}
+      {!compact && ev.isInHome && ev.phone && <div style={{ fontSize: 10, color: C.steel, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>📞 {ev.phone}</div>}
       </div>
     );
   };
@@ -1576,7 +1581,8 @@ function CalendarView({ currentUser, staff, clients, sessions, classInstances, c
         `DTSTART:${fmtIcal(s.date, s.time)}`,
         `DURATION:PT${s.duration || 90}M`,
         `SUMMARY:${client?.name || "Client"} – ${st.label}`,
-        `DESCRIPTION:$${s.price} · ${s.paid ? "Paid" : "Unpaid"}`,
+        `DESCRIPTION:${client?.name || "Client"} · 📞 ${client?.phone || ""}\n$${s.price} · ${s.paid ? "Paid" : "Unpaid"}${st.location === "in-home" && client?.address ? "\n📍 " + client.address : ""}`,
+        ...(st.location === "in-home" && client?.address ? [`LOCATION:${client.address}`] : []),
         "END:VEVENT");
     });
     classInstances.forEach(ci => {
@@ -1938,6 +1944,8 @@ function Sessions({ currentUser, staff, clients, sessions, setSessions, schedule
                   {currentUser.role === "admin" && <div style={{ fontSize: 12, color: C.gold, marginTop: 2 }}>Trainer: {trainer?.name}</div>}
                   {s.notes && <div style={{ fontSize: 12, color: C.steel, marginTop: 4, fontStyle: "italic" }}>📝 {s.notes}</div>}
                   <div style={{ fontSize: 12, color: C.silver, marginTop: 2 }}>🐕 {client?.dogs?.map(d => d.name).join(", ")}</div>
+                  {st.location === "in-home" && client?.address && <div style={{ fontSize: 12, color: C.gold, marginTop: 3, fontWeight: 700 }}>📍 {client.address}</div>}
+                  {st.location === "in-home" && client?.phone && <div style={{ fontSize: 12, color: C.steel, marginTop: 1 }}>📞 {client.phone}</div>}
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start" }}>
                   {s.status !== "cancelled" && <>
