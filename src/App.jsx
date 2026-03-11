@@ -767,7 +767,7 @@ function BookClass({ client, discountCodes, giftCards, classTemplates, classInst
       <p style={{ color: C.steel, fontSize: 15, lineHeight: 1.8 }}><b>{tmpl.name}</b><br />with <b>{instructor.name}</b><br />{tmpl.weeks} sessions · {fmt12(selected.time)}</p>
       <div style={{ background: C.cream, borderRadius: 14, padding: 16, textAlign: "left", margin: "16px 0" }}>
         <div style={{ fontWeight: 800, marginBottom: 8, fontSize: 13 }}>Your Session Dates</div>
-        {Array.from({ length: tmpl.weeks || 1 }, (_, i) => addWeeks(selected.startDate, i)).map(d => (
+        {(selected.meetingDates || Array.from({ length: tmpl.weeks || 1 }, (_, i) => addWeeks(selected.startDate, i))).map(d => (
           <div key={d} style={{ fontSize: 14, color: C.steel, padding: "4px 0", borderBottom: `1px solid ${C.fog}` }}>{fmtDate(d)}</div>
         ))}
       </div>
@@ -1026,6 +1026,7 @@ function MyBookings({ bookings, setBookings, staffList, schedule, classInstances
                         {b.status === "cancelled" && <Pill color={C.silver}>Cancelled</Pill>}
                       </div>
                       <div style={{ fontSize: 13, color: C.silver }}>{b.weeks === 1 ? fmtDate(b.startDate) : `${b.weeks} sessions · Starts ${fmtDate(b.startDate)}`} · {fmt12(b.time)}</div>
+                      {b.note && <div style={{ fontSize: 12, color: C.gold, marginTop: 3, fontStyle: "italic" }}>📝 {b.note}</div>}
                       <div style={{ fontSize: 13, color: C.gold }}>with {b.trainerName}{b.price > 0 ? ` · $${b.price}` : " · Free"}</div>
                       {b.waitlisted && <div style={{ marginTop: 8, background: C.sky + "22", borderRadius: 8, padding: "6px 10px", fontSize: 13, color: C.sky }}>On waitlist — you'll be notified if a spot opens!</div>}
                       {tooLateToCancelFree && <div style={{ fontSize: 12, color: C.rust, marginTop: 4 }}>⚠ Within 1 hour of class — cancellation unavailable</div>}
@@ -1285,7 +1286,7 @@ function ClientPortal({ client, setClient, onSignOut, staff, sessions, classTemp
       const instructor = staff.find(s => s.id === booking.instance.instructorId);
       const enrolledCount = booking.instance.enrolledIds?.length || booking.instance.enrolledCount || 0;
       const full = (tmpl?.maxDogs || 6) - enrolledCount <= 0;
-      setBookings(bs => [...bs, { id: Date.now(), bookingType: "class", instanceId: booking.instance.id, templateId: tmpl?.id, className: tmpl?.name, trainerName: instructor?.name, startDate: booking.instance.startDate, time: booking.instance.time, weeks: tmpl?.weeks, price: tmpl?.price, status: "confirmed", waitlisted: full, freeClass: !!(tmpl?.freeClass), dates: Array.from({ length: tmpl?.weeks || 1 }, (_, i) => addWeeks(booking.instance.startDate, i)) }]);
+      setBookings(bs => [...bs, { id: Date.now(), bookingType: "class", instanceId: booking.instance.id, templateId: tmpl?.id, className: tmpl?.name, trainerName: instructor?.name, startDate: booking.instance.startDate, time: booking.instance.time, weeks: tmpl?.weeks, price: tmpl?.price, status: "confirmed", waitlisted: full, freeClass: !!(tmpl?.freeClass), note: booking.instance.note || "", dates: booking.instance.meetingDates || Array.from({ length: tmpl?.weeks || 1 }, (_, i) => addWeeks(booking.instance.startDate, i)) }]);
     }
     setPage("bookings");
   };
@@ -1573,6 +1574,7 @@ function CalendarView({ currentUser, staff, clients, sessions, classInstances, c
       });
     });
     classInstances.filter(ci => {
+      if (ci.meetingDates?.length) return ci.meetingDates.includes(ds);
       const weeks = classTemplates.find(t => t.id === ci.templateId)?.weeks || 1;
       for (let w = 0; w < weeks; w++) { if (addDays(ci.startDate, w * 7) === ds) return true; }
       return false;
@@ -1583,6 +1585,7 @@ function CalendarView({ currentUser, staff, clients, sessions, classInstances, c
         events.push({
           key: `c-${ci.id}-${ds}`, time: ci.time, label: tmpl?.name || "Class",
           sub: isAdmin ? `${trainer?.firstName || trainer?.name} · ${ci.enrolledIds.length} enrolled` : `${ci.enrolledIds.length} enrolled`,
+          note: ci.note || "",
           color: C.sky, kind: "class"
         });
       }
@@ -1617,6 +1620,7 @@ function CalendarView({ currentUser, staff, clients, sessions, classInstances, c
         {!compact && ev.sub && <div style={{ fontSize: 10, color: C.steel, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ev.sub}</div>}
       {!compact && ev.isInHome && ev.address && <div style={{ fontSize: 10, color: C.gold, fontWeight: 700, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>📍 {ev.address}</div>}
       {!compact && ev.isInHome && ev.phone && <div style={{ fontSize: 10, color: C.steel, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>📞 {ev.phone}</div>}
+      {!compact && ev.note && <div style={{ fontSize: 10, color: C.gold, fontStyle: "italic", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>📝 {ev.note}</div>}
       </div>
     );
   };
@@ -1644,14 +1648,27 @@ function CalendarView({ currentUser, staff, clients, sessions, classInstances, c
     classInstances.forEach(ci => {
       if (!isAdmin && ci.instructorId !== currentUser.id) return;
       const tmpl = classTemplates.find(t => t.id === ci.templateId);
-      const weeks = tmpl?.weeks || 1;
-      lines.push("BEGIN:VEVENT",
-        `UID:class-${ci.id}@corecanine`,
-        `DTSTART:${fmtIcal(ci.startDate, ci.time)}`,
-        `DURATION:PT${ci.duration || 60}M`,
-        `RRULE:FREQ=WEEKLY;COUNT=${weeks}`,
-        `SUMMARY:${tmpl?.name || "Class"} (${ci.enrolledIds.length} enrolled)`,
-        "END:VEVENT");
+      if (ci.meetingDates?.length) {
+        // Has skip weeks — export each meeting date as a separate event
+        ci.meetingDates.forEach((d, i) => {
+          lines.push("BEGIN:VEVENT",
+            `UID:class-${ci.id}-${i}@corecanine`,
+            `DTSTART:${fmtIcal(d, ci.time)}`,
+            `DURATION:PT${ci.duration || 60}M`,
+            `SUMMARY:${tmpl?.name || "Class"} – Session ${i + 1} of ${ci.meetingDates.length}`,
+            ...(ci.note ? [`DESCRIPTION:${ci.note}`] : []),
+            "END:VEVENT");
+        });
+      } else {
+        const weeks = tmpl?.weeks || 1;
+        lines.push("BEGIN:VEVENT",
+          `UID:class-${ci.id}@corecanine`,
+          `DTSTART:${fmtIcal(ci.startDate, ci.time)}`,
+          `DURATION:PT${ci.duration || 60}M`,
+          `RRULE:FREQ=WEEKLY;COUNT=${weeks}`,
+          `SUMMARY:${tmpl?.name || "Class"} (${ci.enrolledIds.length} enrolled)`,
+          "END:VEVENT");
+      }
     });
     lines.push("END:VCALENDAR");
     const blob = new Blob([lines.join("\r\n")], { type: "text/calendar" });
@@ -2071,7 +2088,7 @@ function Classes({ currentUser, staff, clients, classTemplates, setClassTemplate
   const [editTmpl, setEditTmpl] = useState(null);
   const [rosterInst, setRosterInst] = useState(null);
   const [tmplForm, setTmplForm] = useState({ name: "", weeks: 4, maxDogs: 6, price: 150, description: "", waitlistEnabled: false, freeClass: false });
-  const [instForm, setInstForm] = useState({ templateId: "", instructorId: String(currentUser.id), startDate: "", time: "" });
+  const [instForm, setInstForm] = useState({ templateId: "", instructorId: String(currentUser.id), startDate: "", time: "", note: "", skipDates: [] });
 
   const saveTmpl = () => {
     if (!tmplForm.name) return;
@@ -2082,7 +2099,29 @@ function Classes({ currentUser, staff, clients, classTemplates, setClassTemplate
 
   const scheduleInstance = () => {
     if (!instForm.templateId || !instForm.startDate || !instForm.time) return;
-    setClassInstances(is => [...is, { ...instForm, id: Date.now(), templateId: parseInt(instForm.templateId), instructorId: parseInt(instForm.instructorId), enrolledIds: [], waitlist: [] }]);
+    const tmpl = classTemplates.find(t => t.id === parseInt(instForm.templateId));
+    const weeks = tmpl?.weeks || 1;
+    const skipSet = new Set(instForm.skipDates);
+    // Generate dates: skip the skipped weeks, extend until we have `weeks` actual meeting dates
+    const meetingDates = [];
+    let w = 0;
+    while (meetingDates.length < weeks) {
+      const d = addWeeks(instForm.startDate, w);
+      if (!skipSet.has(d)) meetingDates.push(d);
+      w++;
+      if (w > weeks + skipSet.size + 5) break; // safety
+    }
+    setClassInstances(is => [...is, {
+      ...instForm,
+      id: Date.now(),
+      templateId: parseInt(instForm.templateId),
+      instructorId: parseInt(instForm.instructorId),
+      enrolledIds: [],
+      waitlist: [],
+      note: instForm.note.trim(),
+      skipDates: instForm.skipDates,
+      meetingDates,
+    }]);
     setShowInstModal(false);
   };
 
@@ -2103,7 +2142,7 @@ function Classes({ currentUser, staff, clients, classTemplates, setClassTemplate
     const tmpl = classTemplates.find(t => t.id === inst.templateId);
     const instructor = staff.find(s => s.id === inst.instructorId);
     const enrolled = clients.filter(c => inst.enrolledIds.includes(c.id));
-    const sessionDates = Array.from({ length: tmpl?.weeks || 1 }, (_, i) => addWeeks(inst.startDate, i));
+    const sessionDates = inst.meetingDates || Array.from({ length: tmpl?.weeks || 1 }, (_, i) => addWeeks(inst.startDate, i));
     const win = window.open("", "_blank");
     win.document.write(`<html><head><title>${tmpl?.name} Roster</title><style>body{font-family:Georgia,serif;padding:40px;max-width:720px;margin:auto}h1{border-bottom:3px solid #C9933A;padding-bottom:12px}.client{margin-bottom:20px;padding:14px;border:1px solid #E8E4DC;border-radius:8px}@media print{button{display:none}}</style></head><body>
     <h1>🐾 ${tmpl?.name}</h1>
@@ -2171,8 +2210,15 @@ function Classes({ currentUser, staff, clients, classTemplates, setClassTemplate
                       <Pill color={full ? C.rust : C.sage}>{full ? "FULL" : `${(tmpl?.maxDogs || 6) - enrolled.length} spots left`}</Pill>
                       {tmpl?.waitlistEnabled && inst.waitlist?.length > 0 && <Pill color={C.sky}>{inst.waitlist.length} waitlisted</Pill>}
                     </div>
-                    <div style={{ fontSize: 13, color: C.silver }}>{fmtDate(inst.startDate)} → {fmtDate(addWeeks(inst.startDate, (tmpl?.weeks || 1) - 1))} · {fmt12(inst.time)} · {tmpl?.weeks} weeks</div>
+                    <div style={{ fontSize: 13, color: C.silver }}>
+                      {inst.meetingDates?.length > 0
+                        ? <>{fmtDate(inst.meetingDates[0])} → {fmtDate(inst.meetingDates[inst.meetingDates.length - 1])}</>
+                        : <>{fmtDate(inst.startDate)} → {fmtDate(addWeeks(inst.startDate, (tmpl?.weeks || 1) - 1))}</>
+                      } · {fmt12(inst.time)} · {tmpl?.weeks} sessions
+                      {inst.skipDates?.length > 0 && <span style={{ color: C.rust, marginLeft: 6 }}>· Skipping {inst.skipDates.map(d => fmtDateShort(d)).join(", ")}</span>}
+                    </div>
                     <div style={{ fontSize: 13, color: C.gold, marginTop: 2 }}>Instructor: {instructor?.name} · ${tmpl?.price}/enrollment</div>
+                    {inst.note && <div style={{ fontSize: 12, color: C.steel, marginTop: 4, fontStyle: "italic" }}>📝 {inst.note}</div>}
                     <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>
                       {enrolled.map(c => <span key={c.id} style={{ background: C.cream, borderRadius: 16, padding: "3px 10px", fontSize: 12, fontWeight: 600, color: C.charcoal }}>{c.name} · 🐕 {c.dogs.map(d => d.name).join(", ")}</span>)}
                       {enrolled.length === 0 && <span style={{ fontSize: 13, color: C.silver }}>No enrollments yet</span>}
@@ -2221,7 +2267,14 @@ function Classes({ currentUser, staff, clients, classTemplates, setClassTemplate
         const tmpl = classTemplates.find(t => t.id === rosterInst.templateId);
         return (
           <Modal wide title={`${tmpl?.name} — Roster`} onClose={() => setRosterInst(null)}>
-            <div style={{ fontSize: 13, color: C.silver, marginBottom: 16 }}>{rosterInst.enrolledIds.length}/{tmpl?.maxDogs} enrolled · {fmtDate(rosterInst.startDate)} · {fmt12(rosterInst.time)}</div>
+            <div style={{ fontSize: 13, color: C.silver, marginBottom: 8 }}>{rosterInst.enrolledIds.length}/{tmpl?.maxDogs} enrolled · {fmt12(rosterInst.time)}</div>
+            {rosterInst.note && <div style={{ fontSize: 12, color: C.gold, fontStyle: "italic", marginBottom: 8 }}>📝 {rosterInst.note}</div>}
+            <div style={{ fontSize: 12, color: C.steel, marginBottom: 16 }}>
+              {(rosterInst.meetingDates || []).length > 0
+                ? rosterInst.meetingDates.map(d => fmtDateShort(d)).join(" · ")
+                : fmtDate(rosterInst.startDate)}
+              {rosterInst.skipDates?.length > 0 && <span style={{ color: C.rust, marginLeft: 6 }}>· Skipping {rosterInst.skipDates.map(d => fmtDateShort(d)).join(", ")}</span>}
+            </div>
             <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
               {clients.map(client => {
                 const isEnrolled = rosterInst.enrolledIds.includes(client.id);
@@ -2274,33 +2327,72 @@ function Classes({ currentUser, staff, clients, classTemplates, setClassTemplate
         </Modal>
       )}
 
-      {showInstModal && (
-        <Modal title="Schedule a Class" onClose={() => setShowInstModal(false)}>
-          <div style={{ display: "grid", gap: 14 }}>
-            <Sel label="Class Template" value={instForm.templateId} onChange={e => setInstForm(f => ({ ...f, templateId: e.target.value }))}>
-              <option value="">Select template…</option>
-              {classTemplates.map(t => <option key={t.id} value={t.id}>{t.name} ({t.weeks} wks, ${t.price})</option>)}
-            </Sel>
-            {currentUser.role === "admin" && (
-              <Sel label="Instructor" value={instForm.instructorId} onChange={e => setInstForm(f => ({ ...f, instructorId: e.target.value }))}>
-                {staff.filter(s => s.active && s.services.includes("group")).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+      {showInstModal && (() => {
+        const instTmpl = classTemplates.find(t => t.id === parseInt(instForm.templateId));
+        const instWeeks = instTmpl?.weeks || 0;
+        // Generate all candidate weekly dates (weeks + enough buffer for skips)
+        const candidateDates = instForm.startDate && instWeeks
+          ? Array.from({ length: instWeeks + (instForm.skipDates?.length || 0) + 2 }, (_, i) => addWeeks(instForm.startDate, i))
+          : [];
+        const skipSet = new Set(instForm.skipDates || []);
+        // Final meeting dates: first `instWeeks` non-skipped dates
+        const finalDates = [];
+        for (const d of candidateDates) {
+          if (finalDates.length >= instWeeks) break;
+          if (!skipSet.has(d)) finalDates.push(d);
+        }
+        const toggleSkip = (d) => {
+          const already = skipSet.has(d);
+          setInstForm(f => ({ ...f, skipDates: already ? f.skipDates.filter(x => x !== d) : [...(f.skipDates || []), d] }));
+        };
+        return (
+          <Modal title="Schedule a Class" onClose={() => setShowInstModal(false)}>
+            <div style={{ display: "grid", gap: 14 }}>
+              <Sel label="Class Template" value={instForm.templateId} onChange={e => setInstForm(f => ({ ...f, templateId: e.target.value, skipDates: [] }))}>
+                <option value="">Select template…</option>
+                {classTemplates.map(t => <option key={t.id} value={t.id}>{t.name} ({t.weeks} wks, ${t.price})</option>)}
               </Sel>
-            )}
-            <Input label="Start Date" type="date" value={instForm.startDate} onChange={e => setInstForm(f => ({ ...f, startDate: e.target.value }))} />
-            <Input label="Time" type="time" value={instForm.time} onChange={e => setInstForm(f => ({ ...f, time: e.target.value }))} />
-            {instForm.templateId && instForm.startDate && (
-              <div style={{ background: C.cream, borderRadius: 10, padding: "12px 16px", fontSize: 13, color: C.steel }}>
-                <b style={{ color: C.obsidian }}>Auto-generated sessions:</b><br />
-                {Array.from({ length: parseInt(classTemplates.find(t => t.id === parseInt(instForm.templateId))?.weeks || 0) }, (_, i) => fmtDate(addWeeks(instForm.startDate, i))).join("  ·  ")}
+              {currentUser.role === "admin" && (
+                <Sel label="Instructor" value={instForm.instructorId} onChange={e => setInstForm(f => ({ ...f, instructorId: e.target.value }))}>
+                  {staff.filter(s => s.active && s.services.includes("group")).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </Sel>
+              )}
+              <Input label="Start Date" type="date" value={instForm.startDate} onChange={e => setInstForm(f => ({ ...f, startDate: e.target.value, skipDates: [] }))} />
+              <Input label="Time" type="time" value={instForm.time} onChange={e => setInstForm(f => ({ ...f, time: e.target.value }))} />
+              <TextArea label="Class Note (optional)" value={instForm.note} onChange={e => setInstForm(f => ({ ...f, note: e.target.value }))} hint='e.g. "This class skips 4/1 for spring break and resumes 4/8"' />
+              {instForm.templateId && instForm.startDate && instWeeks > 0 && (
+                <div style={{ background: C.cream, borderRadius: 10, padding: "12px 16px" }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: C.obsidian, marginBottom: 8 }}>Select any weeks to skip:</div>
+                  <div style={{ display: "grid", gap: 6 }}>
+                    {candidateDates.map((d, i) => {
+                      const isSkipped = skipSet.has(d);
+                      const isMeeting = finalDates.includes(d);
+                      return (
+                        <label key={d} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 13, color: isSkipped ? C.silver : C.obsidian, textDecoration: isSkipped ? "line-through" : "none" }}>
+                          <input type="checkbox" checked={isSkipped} onChange={() => toggleSkip(d)} />
+                          <span>{fmtDate(d)}</span>
+                          {isSkipped && <Pill color={C.rust}>Skipped</Pill>}
+                          {!isSkipped && i < instWeeks + skipSet.size && finalDates.indexOf(d) < instWeeks && <span style={{ fontSize: 11, color: C.sage, fontWeight: 700 }}>Session {finalDates.indexOf(d) + 1}</span>}
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {finalDates.length > 0 && (
+                    <div style={{ marginTop: 12, paddingTop: 10, borderTop: `1px solid ${C.fog}`, fontSize: 12, color: C.steel }}>
+                      <b style={{ color: C.obsidian }}>Meeting dates: </b>{finalDates.map(d => fmtDateShort(d)).join(" · ")}
+                      {instForm.skipDates?.length > 0 && <span style={{ color: C.gold, marginLeft: 8 }}>· Ends {fmtDate(finalDates[finalDates.length - 1])}</span>}
+                    </div>
+                  )}
+                </div>
+              )}
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                <Btn variant="ghost" onClick={() => setShowInstModal(false)}>Cancel</Btn>
+                <Btn onClick={scheduleInstance}>Schedule Class</Btn>
               </div>
-            )}
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <Btn variant="ghost" onClick={() => setShowInstModal(false)}>Cancel</Btn>
-              <Btn onClick={scheduleInstance}>Schedule Class</Btn>
             </div>
-          </div>
-        </Modal>
-      )}
+          </Modal>
+        );
+      })()}
     </div>
   );
 }
