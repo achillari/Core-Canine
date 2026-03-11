@@ -2086,6 +2086,7 @@ function Classes({ currentUser, staff, clients, classTemplates, setClassTemplate
   const [showTmplModal, setShowTmplModal] = useState(false);
   const [showInstModal, setShowInstModal] = useState(false);
   const [editTmpl, setEditTmpl] = useState(null);
+  const [editInst, setEditInst] = useState(null);
   const [rosterInst, setRosterInst] = useState(null);
   const [tmplForm, setTmplForm] = useState({ name: "", weeks: 4, maxDogs: 6, price: 150, description: "", waitlistEnabled: false, freeClass: false });
   const [instForm, setInstForm] = useState({ templateId: "", instructorId: String(currentUser.id), startDate: "", time: "", note: "", skipDates: [] });
@@ -2111,17 +2112,20 @@ function Classes({ currentUser, staff, clients, classTemplates, setClassTemplate
       w++;
       if (w > weeks + skipSet.size + 5) break; // safety
     }
-    setClassInstances(is => [...is, {
+    const updatedInst = {
       ...instForm,
-      id: Date.now(),
       templateId: parseInt(instForm.templateId),
       instructorId: parseInt(instForm.instructorId),
-      enrolledIds: [],
-      waitlist: [],
       note: instForm.note.trim(),
       skipDates: instForm.skipDates,
       meetingDates,
-    }]);
+    };
+    if (editInst) {
+      setClassInstances(is => is.map(i => i.id === editInst.id ? { ...i, ...updatedInst } : i));
+    } else {
+      setClassInstances(is => [...is, { ...updatedInst, id: Date.now(), enrolledIds: [], waitlist: [] }]);
+    }
+    setEditInst(null);
     setShowInstModal(false);
   };
 
@@ -2162,7 +2166,7 @@ function Classes({ currentUser, staff, clients, classTemplates, setClassTemplate
         <h1 style={{ fontFamily: "Georgia, serif", fontSize: 26, color: C.obsidian, margin: 0 }}>Group Classes</h1>
         <div style={{ display: "flex", gap: 8 }}>
           {currentUser.role === "admin" && <Btn variant="ghost" onClick={() => { setEditTmpl(null); setTmplForm({ name: "", weeks: 4, maxDogs: 6, price: 150, description: "", waitlistEnabled: false, freeClass: false }); setShowTmplModal(true); }}>+ Class Template</Btn>}
-          {currentUser.role === "admin" && <Btn onClick={() => { setInstForm({ templateId: "", instructorId: String(currentUser.id), startDate: "", time: "" }); setShowInstModal(true); }}>+ Schedule Class</Btn>}
+          {currentUser.role === "admin" && <Btn onClick={() => { setEditInst(null); setInstForm({ templateId: "", instructorId: String(currentUser.id), startDate: "", time: "", note: "", skipDates: [] }); setShowInstModal(true); }}>+ Schedule Class</Btn>}
         </div>
       </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
@@ -2224,8 +2228,9 @@ function Classes({ currentUser, staff, clients, classTemplates, setClassTemplate
                       {enrolled.length === 0 && <span style={{ fontSize: 13, color: C.silver }}>No enrollments yet</span>}
                     </div>
                   </div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <Btn small variant="ghost" onClick={() => setRosterInst(inst)}>👥 Roster</Btn>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <Btn small variant="sage" onClick={() => setRosterInst(inst)}>👥 Roster</Btn>
+                    <Btn small variant="ghost" onClick={() => { setEditInst(inst); setInstForm({ templateId: String(inst.templateId), instructorId: String(inst.instructorId), startDate: inst.startDate, time: inst.time, note: inst.note || "", skipDates: inst.skipDates || [] }); setShowInstModal(true); }}>✏️ Edit</Btn>
                     <Btn small variant="dark" onClick={() => printRoster(inst)}>🖨️ Print</Btn>
                   </div>
                 </div>
@@ -2346,7 +2351,7 @@ function Classes({ currentUser, staff, clients, classTemplates, setClassTemplate
           setInstForm(f => ({ ...f, skipDates: already ? f.skipDates.filter(x => x !== d) : [...(f.skipDates || []), d] }));
         };
         return (
-          <Modal title="Schedule a Class" onClose={() => setShowInstModal(false)}>
+          <Modal title={editInst ? "Edit Class" : "Schedule a Class"} onClose={() => { setEditInst(null); setShowInstModal(false); }}>
             <div style={{ display: "grid", gap: 14 }}>
               <Sel label="Class Template" value={instForm.templateId} onChange={e => setInstForm(f => ({ ...f, templateId: e.target.value, skipDates: [] }))}>
                 <option value="">Select template…</option>
@@ -2387,7 +2392,7 @@ function Classes({ currentUser, staff, clients, classTemplates, setClassTemplate
               )}
               <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
                 <Btn variant="ghost" onClick={() => setShowInstModal(false)}>Cancel</Btn>
-                <Btn onClick={scheduleInstance}>Schedule Class</Btn>
+                <Btn onClick={scheduleInstance}>{editInst ? "Save Changes" : "Schedule Class"}</Btn>
               </div>
             </div>
           </Modal>
