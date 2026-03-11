@@ -2155,6 +2155,7 @@ function Classes({ currentUser, staff, clients, classTemplates, setClassTemplate
       )}
 
       {view === "instances" && (
+        <>
         <div style={{ display: "grid", gap: 16 }}>
           {myInstances.map(inst => {
             const tmpl = classTemplates.find(t => t.id === inst.templateId);
@@ -2213,6 +2214,7 @@ function Classes({ currentUser, staff, clients, classTemplates, setClassTemplate
             </div>
           </div>
         )}
+        </>
       )}
 
       {rosterInst && (() => {
