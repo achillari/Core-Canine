@@ -2287,6 +2287,7 @@ function Classes({ currentUser, staff, clients, setClients, classTemplates, setC
   const [rosterInst, setRosterInst] = useState(null);
   const [removeModal, setRemoveModal] = useState(null); // { client, inst, tmpl }
   const [removeChoice, setRemoveChoice] = useState("credit");
+  const [rosterSearch, setRosterSearch] = useState("");
   const [tmplForm, setTmplForm] = useState({ name: "", weeks: 4, maxDogs: 6, price: 150, description: "", waitlistEnabled: false, freeClass: false });
   const [instForm, setInstForm] = useState({ templateId: "", instructorId: String(currentUser.id), startDate: "", time: "", duration: 60, note: "", skipDates: [] });
 
@@ -2493,13 +2494,12 @@ function Classes({ currentUser, staff, clients, setClients, classTemplates, setC
         const enrolledClients = clients.filter(c => rosterInst.enrolledIds.includes(c.id));
         const waitlistedClients = clients.filter(c => rosterInst.waitlist?.includes(c.id));
         const notInClass = clients.filter(c => !rosterInst.enrolledIds.includes(c.id) && !rosterInst.waitlist?.includes(c.id));
-        const [rosterSearch, setRosterSearch] = React.useState("");
         const searchResults = rosterSearch.trim().length > 0
           ? notInClass.filter(c => c.name.toLowerCase().includes(rosterSearch.toLowerCase()) || c.dogs.some(d => d.name.toLowerCase().includes(rosterSearch.toLowerCase())))
           : [];
         const full = enrolledClients.length >= (tmpl?.maxDogs || 6);
         return (
-          <Modal wide title={`${tmpl?.name} — Roster`} onClose={() => setRosterInst(null)}>
+          <Modal wide title={`${tmpl?.name} — Roster`} onClose={() => { setRosterInst(null); setRosterSearch(""); }}>
             <div style={{ fontSize: 13, color: C.silver, marginBottom: 8 }}>{enrolledClients.length}/{tmpl?.maxDogs} enrolled · {fmt12(rosterInst.time)}</div>
             {rosterInst.note && <div style={{ fontSize: 12, color: C.gold, fontStyle: "italic", marginBottom: 8 }}>📝 {rosterInst.note}</div>}
             <div style={{ fontSize: 12, color: C.steel, marginBottom: 16 }}>
@@ -2592,7 +2592,7 @@ function Classes({ currentUser, staff, clients, setClients, classTemplates, setC
 
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <Btn variant="dark" onClick={() => printRoster(rosterInst)}>🖨️ Print Roster</Btn>
-              <Btn variant="ghost" onClick={() => setRosterInst(null)}>Close</Btn>
+              <Btn variant="ghost" onClick={() => { setRosterInst(null); setRosterSearch(""); }}>Close</Btn>
             </div>
           </Modal>
         );
