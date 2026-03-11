@@ -450,7 +450,7 @@ function Onboarding({ client, onComplete }) {
                     <input type="file" accept="image/*" ref={photoRef} onChange={e => { const f = e.target.files[0]; if (f) { const r = new FileReader(); r.onload = x => setDogForm(d => ({ ...d, photo: x.target.result })); r.readAsDataURL(f); } }} style={{ display: "none" }} />
                     <button onClick={() => photoRef.current.click()} style={{ ...inputStyle, cursor: "pointer", textAlign: "left", background: C.white, color: dogForm.photo ? C.sage : C.silver, fontSize: 13 }}>{dogForm.photo ? "✓ Photo added" : "📷 Upload photo"}</button>
                   </Field>
-                  <Btn variant="sky" onClick={addDog}>✓ Save {dogForm.name || "Dog"}</Btn>
+                  <Btn variant="sky" onClick={addDog}>{dogs.length === 0 ? (dogForm.name ? `✓ Save ${dogForm.name}` : "✓ Save Dog") : (dogForm.name ? `+ Add ${dogForm.name}` : `+ Add ${dogs.length === 1 ? "Second" : dogs.length === 2 ? "Third" : "Another"} Dog`)}</Btn>
                 </div>
               </div>
               <div style={{ display: "flex", gap: 10 }}>
