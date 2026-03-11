@@ -1411,6 +1411,30 @@ function Dashboard({ currentUser, staff, clients, sessions, classInstances, clas
 }
 
 // ─── CALENDAR VIEW ────────────────────────────────────────────────────────────
+// ─── DOG NOTE INPUT (sub-component so useState is legal) ─────────────────────
+function DogNoteInput({ dog, dogNotes, addNote }) {
+  const [newNote, setNewNote] = useState("");
+  const notes = dogNotes[dog.id] || [];
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ fontWeight: 700, color: C.obsidian, marginBottom: 8 }}>🐕 {dog.name}</div>
+      <div style={{ background: C.cream, borderRadius: 10, padding: 14, minHeight: 60, marginBottom: 10 }}>
+        {notes.length === 0 && <span style={{ color: C.silver, fontSize: 13 }}>No notes yet.</span>}
+        {notes.map(n => (
+          <div key={n.id} style={{ padding: "8px 0", borderBottom: `1px solid ${C.fog}` }}>
+            <div style={{ fontSize: 11, color: C.silver, marginBottom: 2 }}>{fmtDate(n.date)}</div>
+            <div style={{ fontSize: 14, color: C.obsidian }}>{n.text}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <input style={{ ...inputStyle, flex: 1 }} placeholder="Add a note…" value={newNote} onChange={e => setNewNote(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { addNote(dog.id, newNote); setNewNote(""); } }} />
+        <Btn small onClick={() => { addNote(dog.id, newNote); setNewNote(""); }}>Add</Btn>
+      </div>
+    </div>
+  );
+}
+
 // ─── CLIENT DETAIL MODAL (shared by Sessions + CalendarView) ─────────────────
 function ClientDetailModal({ client, sessions, dogNotes, setDogNotes, currentUser, onClose }) {
   const [activeTab, setActiveTab] = useState("info");
@@ -1456,28 +1480,9 @@ function ClientDetailModal({ client, sessions, dogNotes, setDogNotes, currentUse
       {activeTab === "notes" && (
         <div>
           <p style={{ fontSize: 13, color: C.silver, marginTop: 0 }}>Trainer-only notes. Clients never see these.</p>
-          {client.dogs?.map(dog => {
-            const notes = dogNotes[dog.id] || [];
-            const [newNote, setNewNote] = useState("");
-            return (
-              <div key={dog.id} style={{ marginBottom: 20 }}>
-                <div style={{ fontWeight: 700, color: C.obsidian, marginBottom: 8 }}>🐕 {dog.name}</div>
-                <div style={{ background: C.cream, borderRadius: 10, padding: 14, minHeight: 60, marginBottom: 10 }}>
-                  {notes.length === 0 && <span style={{ color: C.silver, fontSize: 13 }}>No notes yet.</span>}
-                  {notes.map(n => (
-                    <div key={n.id} style={{ padding: "8px 0", borderBottom: `1px solid ${C.fog}` }}>
-                      <div style={{ fontSize: 11, color: C.silver, marginBottom: 2 }}>{fmtDate(n.date)}</div>
-                      <div style={{ fontSize: 14, color: C.obsidian }}>{n.text}</div>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <input style={{ ...inputStyle, flex: 1 }} placeholder="Add a note…" value={newNote} onChange={e => setNewNote(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { addNote(dog.id, newNote); setNewNote(""); } }} />
-                  <Btn small onClick={() => { addNote(dog.id, newNote); setNewNote(""); }}>Add</Btn>
-                </div>
-              </div>
-            );
-          })}
+          {client.dogs?.map(dog => (
+            <DogNoteInput key={dog.id} dog={dog} dogNotes={dogNotes} addNote={addNote} />
+          ))}
         </div>
       )}
       {activeTab === "history" && (
@@ -2356,28 +2361,9 @@ function Clients({ currentUser, clients, setClients, sessions, dogNotes, setDogN
             {activeTab === "notes" && (
               <div>
                 <p style={{ fontSize: 13, color: C.silver, marginTop: 0 }}>Trainer-only notes. Clients never see these.</p>
-                {selected.dogs?.map(dog => {
-                  const notes = dogNotes[dog.id] || [];
-                  const [newNote, setNewNote] = useState("");
-                  return (
-                    <div key={dog.id} style={{ marginBottom: 20 }}>
-                      <div style={{ fontWeight: 700, color: C.obsidian, marginBottom: 8 }}>🐕 {dog.name}</div>
-                      <div style={{ background: C.cream, borderRadius: 10, padding: 14, minHeight: 80, marginBottom: 10 }}>
-                        {notes.length === 0 && <span style={{ color: C.silver, fontSize: 13 }}>No notes yet.</span>}
-                        {notes.map(n => (
-                          <div key={n.id} style={{ padding: "8px 0", borderBottom: `1px solid ${C.fog}` }}>
-                            <div style={{ fontSize: 11, color: C.silver, marginBottom: 2 }}>{fmtDate(n.date)}</div>
-                            <div style={{ fontSize: 14, color: C.obsidian }}>{n.text}</div>
-                          </div>
-                        ))}
-                      </div>
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <input style={{ ...inputStyle, flex: 1 }} placeholder="Add a note…" value={newNote} onChange={e => setNewNote(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { addNote(dog.id, newNote); setNewNote(""); } }} />
-                        <Btn small onClick={() => { addNote(dog.id, newNote); setNewNote(""); }}>Add</Btn>
-                      </div>
-                    </div>
-                  );
-                })}
+                {client.dogs?.map(dog => (
+                  <DogNoteInput key={dog.id} dog={dog} dogNotes={dogNotes} addNote={addNote} />
+                ))}
               </div>
             )}
             {activeTab === "history" && (
