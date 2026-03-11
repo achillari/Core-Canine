@@ -2357,7 +2357,7 @@ function Classes({ currentUser, staff, clients, setClients, classTemplates, setC
     win.document.close();
   };
 
-  const [instFilter, setInstFilter] = useState("upcoming");
+  const [instFilter, setInstFilter] = useState("current");
   const [emailInst, setEmailInst] = useState(null); // instance to email
   const [emailTmplId, setEmailTmplId] = useState("");
   const [emailSubject, setEmailSubject] = useState("");
@@ -2366,10 +2366,10 @@ function Classes({ currentUser, staff, clients, setClients, classTemplates, setC
 
   const allMyInstances = classInstances.filter(i => currentUser.role === "admin" || i.instructorId === currentUser.id);
   const myInstances = allMyInstances.filter(inst => {
-    const endDate = inst.meetingDates?.length > 0
-      ? inst.meetingDates[inst.meetingDates.length - 1]
-      : inst.startDate;
-    if (instFilter === "upcoming") return endDate >= today;
+    const startDate = inst.meetingDates?.length > 0 ? inst.meetingDates[0] : inst.startDate;
+    const endDate = inst.meetingDates?.length > 0 ? inst.meetingDates[inst.meetingDates.length - 1] : inst.startDate;
+    if (instFilter === "current") return startDate <= today && endDate >= today;
+    if (instFilter === "upcoming") return startDate > today;
     if (instFilter === "past") return endDate < today;
     return true;
   });
@@ -2414,7 +2414,7 @@ function Classes({ currentUser, staff, clients, setClients, classTemplates, setC
       {view === "instances" && (
         <>
         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-          {[["upcoming", "Upcoming"], ["past", "Past"], ["all", "All"]].map(([v, label]) => (
+          {[["current", "Current"], ["upcoming", "Upcoming"], ["past", "Past"], ["all", "All"]].map(([v, label]) => (
             <button key={v} onClick={() => setInstFilter(v)} style={{ padding: "6px 16px", borderRadius: 20, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 12, background: instFilter === v ? C.obsidian : C.fog, color: instFilter === v ? C.cream : C.charcoal }}>{label}</button>
           ))}
         </div>
@@ -2457,7 +2457,7 @@ function Classes({ currentUser, staff, clients, setClients, classTemplates, setC
               </Card>
             );
           })}
-          {myInstances.length === 0 && <p style={{ color: C.silver }}>{instFilter === "past" ? "No past classes found." : instFilter === "upcoming" ? "No upcoming classes scheduled." : "No classes found."}</p>}
+          {myInstances.length === 0 && <p style={{ color: C.silver }}>{instFilter === "current" ? "No classes currently in session." : instFilter === "past" ? "No past classes found." : instFilter === "upcoming" ? "No upcoming classes scheduled." : "No classes found."}</p>}
         </div>
         {promotionLog && promotionLog.length > 0 && (
           <div style={{ marginTop: 24 }}>
