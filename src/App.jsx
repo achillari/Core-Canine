@@ -2493,6 +2493,10 @@ function Classes({ currentUser, staff, clients, setClients, classTemplates, setC
         const enrolledClients = clients.filter(c => rosterInst.enrolledIds.includes(c.id));
         const waitlistedClients = clients.filter(c => rosterInst.waitlist?.includes(c.id));
         const notInClass = clients.filter(c => !rosterInst.enrolledIds.includes(c.id) && !rosterInst.waitlist?.includes(c.id));
+        const [rosterSearch, setRosterSearch] = React.useState("");
+        const searchResults = rosterSearch.trim().length > 0
+          ? notInClass.filter(c => c.name.toLowerCase().includes(rosterSearch.toLowerCase()) || c.dogs.some(d => d.name.toLowerCase().includes(rosterSearch.toLowerCase())))
+          : [];
         const full = enrolledClients.length >= (tmpl?.maxDogs || 6);
         return (
           <Modal wide title={`${tmpl?.name} — Roster`} onClose={() => setRosterInst(null)}>
@@ -2554,16 +2558,34 @@ function Classes({ currentUser, staff, clients, setClients, classTemplates, setC
             {notInClass.length > 0 && (
               <div style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 11, fontWeight: 800, color: C.silver, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Add Client</div>
-                <select style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1.5px solid ${C.fog}`, fontSize: 14, fontFamily: "inherit", color: C.obsidian, background: C.white }} onChange={e => {
-                  const clientId = parseInt(e.target.value);
-                  if (!clientId) return;
-                  e.target.value = "";
-                  toggleEnroll(rosterInst.id, clientId);
-                  setRosterInst(ri => ({ ...ri, enrolledIds: full ? ri.enrolledIds : [...ri.enrolledIds, clientId], waitlist: full ? [...(ri.waitlist || []), clientId] : ri.waitlist }));
-                }}>
-                  <option value="">— Select a client to add —</option>
-                  {notInClass.map(c => <option key={c.id} value={c.id}>{c.name} · 🐕 {c.dogs.map(d => d.name).join(", ")}</option>)}
-                </select>
+                <input
+                  style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1.5px solid ${C.fog}`, fontSize: 14, fontFamily: "inherit", color: C.obsidian, background: C.white, boxSizing: "border-box" }}
+                  placeholder="Search by client or dog name…"
+                  value={rosterSearch}
+                  onChange={e => setRosterSearch(e.target.value)}
+                />
+                {rosterSearch.trim().length > 0 && (
+                  <div style={{ border: `1.5px solid ${C.fog}`, borderTop: "none", borderRadius: "0 0 8px 8px", background: C.white, maxHeight: 220, overflowY: "auto" }}>
+                    {searchResults.length === 0 && (
+                      <div style={{ padding: "10px 14px", fontSize: 13, color: C.silver }}>No clients found</div>
+                    )}
+                    {searchResults.map(c => (
+                      <div key={c.id} onClick={() => {
+                        toggleEnroll(rosterInst.id, c.id);
+                        setRosterInst(ri => ({ ...ri, enrolledIds: full ? ri.enrolledIds : [...ri.enrolledIds, c.id], waitlist: full ? [...(ri.waitlist || []), c.id] : ri.waitlist }));
+                        setRosterSearch("");
+                      }} style={{ padding: "10px 14px", cursor: "pointer", borderBottom: `1px solid ${C.fog}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                        onMouseEnter={e => e.currentTarget.style.background = C.cream}
+                        onMouseLeave={e => e.currentTarget.style.background = C.white}>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: 14, color: C.obsidian }}>{c.name}</div>
+                          <div style={{ fontSize: 12, color: C.silver }}>🐕 {c.dogs.map(d => d.name).join(", ")}</div>
+                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: full ? C.gold : C.sage }}>{full ? "+ Waitlist" : "+ Add"}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {full && <div style={{ fontSize: 12, color: C.gold, marginTop: 6 }}>⚠️ Class is full — adding a client will place them on the waitlist.</div>}
               </div>
             )}
