@@ -221,7 +221,7 @@ const CLIENT_NAV = [
 // ─── UNIFIED LOGIN ────────────────────────────────────────────────────────────
 function UnifiedLogin({ onStaffLogin, onClientLogin, staff, clients, settings }) {
   const [mode, setMode] = useState("client"); // "client" | "staff"
-  const [signupMode, setSignupMode] = useState("signup"); // default New Client on left
+  const [signupMode, setSignupMode] = useState("signup");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [step, setStep] = useState("phone");
@@ -230,10 +230,11 @@ function UnifiedLogin({ onStaffLogin, onClientLogin, staff, clients, settings })
 
   const clean = p => p.replace(/\D/g, "").slice(-7);
 
+  const switchMode = (m) => { setMode(m); setStep("phone"); setError(""); setCode(""); setPhone(""); };
+
   const sendCode = () => {
     const p = clean(phone);
     if (p.length < 7) { setError("Please enter a valid phone number."); return; }
-
     if (mode === "staff") {
       const found = staff.find(s => clean(s.phone) === p);
       if (!found) { setError("Phone number not found. Contact Core Canine admin."); return; }
@@ -241,7 +242,7 @@ function UnifiedLogin({ onStaffLogin, onClientLogin, staff, clients, settings })
     } else {
       if (signupMode === "login") {
         const found = clients.find(c => clean(c.phone) === p);
-        if (!found) { setError("No account found. Switch to New Client to sign up."); return; }
+        if (!found) { setError("No account found. Try New Client to sign up."); return; }
         setFoundUser({ type: "client", user: found });
       } else {
         setFoundUser({ type: "newClient", phone });
@@ -259,7 +260,9 @@ function UnifiedLogin({ onStaffLogin, onClientLogin, staff, clients, settings })
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: C.obsidian, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, flexDirection: "column", gap: 20 }}>
+    <div style={{ minHeight: "100vh", background: C.obsidian, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 20, gap: 24 }}>
+
+      {/* Logo / branding */}
       <div style={{ textAlign: "center" }}>
         {settings?.logoUrl
           ? <img src={settings.logoUrl} alt="Core Canine" style={{ maxHeight: 100, maxWidth: 260, objectFit: "contain", marginBottom: 10 }} />
@@ -268,46 +271,82 @@ function UnifiedLogin({ onStaffLogin, onClientLogin, staff, clients, settings })
         <p style={{ color: C.silver, margin: 0, fontSize: 15 }}>Professional Dog Training</p>
       </div>
 
+      {/* Card */}
       <div style={{ background: C.white, borderRadius: 20, padding: "32px 28px", width: "100%", maxWidth: 420, boxShadow: "0 30px 80px rgba(0,0,0,0.4)" }}>
-        {/* Mode tabs: Client vs Staff */}
-        <div style={{ display: "flex", gap: 0, marginBottom: 20, background: C.cream, borderRadius: 10, padding: 4 }}>
-          {[["client", "Client Portal"], ["staff", "Staff Login"]].map(([m, l]) => (
-            <button key={m} onClick={() => { setMode(m); setStep("phone"); setError(""); setCode(""); setPhone(""); }} style={{ flex: 1, padding: "9px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "inherit", background: mode === m ? C.obsidian : "transparent", color: mode === m ? C.cream : C.silver, transition: "all 0.15s" }}>{l}</button>
-          ))}
-        </div>
 
-        {/* Client: New Client (left) | Sign In (right) */}
-        {mode === "client" && (
-          <div style={{ display: "flex", gap: 0, marginBottom: 20, background: C.cream, borderRadius: 10, padding: 4 }}>
-            {[["signup", "New Client"], ["login", "Sign In"]].map(([m, l]) => (
-              <button key={m} onClick={() => { setSignupMode(m); setStep("phone"); setError(""); setCode(""); }} style={{ flex: 1, padding: "8px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "inherit", background: signupMode === m ? C.gold : "transparent", color: signupMode === m ? C.obsidian : C.silver, transition: "all 0.15s" }}>{l}</button>
-            ))}
-          </div>
-        )}
+        {mode === "client" ? (
+          <>
+            {/* Client toggle: New Client | Returning Client */}
+            <div style={{ display: "flex", gap: 0, marginBottom: 22, background: C.cream, borderRadius: 10, padding: 4 }}>
+              {[["signup", "New Client"], ["login", "Returning Client"]].map(([m, l]) => (
+                <button key={m} onClick={() => { setSignupMode(m); setStep("phone"); setError(""); setCode(""); }} style={{ flex: 1, padding: "9px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "inherit", background: signupMode === m ? C.gold : "transparent", color: signupMode === m ? C.obsidian : C.silver, transition: "all 0.15s" }}>{l}</button>
+              ))}
+            </div>
 
-        {step === "phone" ? (
-          <div style={{ display: "grid", gap: 14 }}>
-            <Field label="Mobile Number">
-              <input style={inputStyle} placeholder="(555) 555-5555" value={phone} onChange={e => setPhone(e.target.value)} onKeyDown={e => e.key === "Enter" && sendCode()} />
-            </Field>
-            {error && <div style={{ color: C.rust, fontSize: 13 }}>{error}</div>}
-            <Btn full onClick={sendCode}>Send Verification Code →</Btn>
-            <p style={{ color: C.silver, fontSize: 11, textAlign: "center", margin: 0 }}>
-              {mode === "staff" ? "Demo staff: 555-0001 (admin) · 555-0002 (trainer)" : signupMode === "login" ? "Demo clients: 555-1001 · 555-1002" : "Use any phone number to create an account"} · code: 1234
-            </p>
-          </div>
+            {step === "phone" ? (
+              <div style={{ display: "grid", gap: 14 }}>
+                <Field label="Mobile Number">
+                  <input style={inputStyle} placeholder="(555) 555-5555" value={phone} onChange={e => setPhone(e.target.value)} onKeyDown={e => e.key === "Enter" && sendCode()} autoFocus />
+                </Field>
+                {error && <div style={{ color: C.rust, fontSize: 13 }}>{error}</div>}
+                <Btn full onClick={sendCode}>{signupMode === "signup" ? "Get Started →" : "Send Verification Code →"}</Btn>
+                <p style={{ color: C.silver, fontSize: 11, textAlign: "center", margin: 0 }}>
+                  {signupMode === "login" ? "Demo: 555-1001 or 555-1002" : "Use any phone number to create an account"} · code: 1234
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gap: 14 }}>
+                <p style={{ color: C.steel, fontSize: 14, margin: 0 }}>Enter the code sent to {phone}</p>
+                <Field label="Verification Code">
+                  <input style={{ ...inputStyle, textAlign: "center", fontSize: 22, letterSpacing: 8, fontWeight: 800 }} placeholder="••••" maxLength={4} value={code} onChange={e => setCode(e.target.value)} onKeyDown={e => e.key === "Enter" && verify()} autoFocus />
+                </Field>
+                {error && <div style={{ color: C.rust, fontSize: 13 }}>{error}</div>}
+                <Btn full onClick={verify}>Verify & Continue →</Btn>
+                <button onClick={() => { setStep("phone"); setError(""); }} style={{ background: "none", border: "none", color: C.silver, cursor: "pointer", fontSize: 13 }}>← Back</button>
+              </div>
+            )}
+          </>
         ) : (
-          <div style={{ display: "grid", gap: 14 }}>
-            <p style={{ color: C.steel, fontSize: 14, margin: 0 }}>Enter the code sent to {phone}</p>
-            <Field label="Verification Code">
-              <input style={{ ...inputStyle, textAlign: "center", fontSize: 22, letterSpacing: 8, fontWeight: 800 }} placeholder="••••" maxLength={4} value={code} onChange={e => setCode(e.target.value)} onKeyDown={e => e.key === "Enter" && verify()} />
-            </Field>
-            {error && <div style={{ color: C.rust, fontSize: 13 }}>{error}</div>}
-            <Btn full onClick={verify}>Verify & Continue →</Btn>
-            <button onClick={() => { setStep("phone"); setError(""); }} style={{ background: "none", border: "none", color: C.silver, cursor: "pointer", fontSize: 13 }}>← Back</button>
-          </div>
+          <>
+            {/* Staff login */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+              <button onClick={() => switchMode("client")} style={{ background: "none", border: "none", color: C.silver, cursor: "pointer", fontSize: 18, lineHeight: 1, padding: 0 }}>←</button>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 15, color: C.obsidian }}>Staff Login</div>
+                <div style={{ fontSize: 12, color: C.silver }}>Core Canine team members only</div>
+              </div>
+            </div>
+
+            {step === "phone" ? (
+              <div style={{ display: "grid", gap: 14 }}>
+                <Field label="Mobile Number">
+                  <input style={inputStyle} placeholder="(555) 555-5555" value={phone} onChange={e => setPhone(e.target.value)} onKeyDown={e => e.key === "Enter" && sendCode()} autoFocus />
+                </Field>
+                {error && <div style={{ color: C.rust, fontSize: 13 }}>{error}</div>}
+                <Btn full onClick={sendCode}>Send Verification Code →</Btn>
+                <p style={{ color: C.silver, fontSize: 11, textAlign: "center", margin: 0 }}>Demo: 555-0001 (admin) · 555-0002 (trainer) · code: 1234</p>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gap: 14 }}>
+                <p style={{ color: C.steel, fontSize: 14, margin: 0 }}>Enter the code sent to {phone}</p>
+                <Field label="Verification Code">
+                  <input style={{ ...inputStyle, textAlign: "center", fontSize: 22, letterSpacing: 8, fontWeight: 800 }} placeholder="••••" maxLength={4} value={code} onChange={e => setCode(e.target.value)} onKeyDown={e => e.key === "Enter" && verify()} autoFocus />
+                </Field>
+                {error && <div style={{ color: C.rust, fontSize: 13 }}>{error}</div>}
+                <Btn full onClick={verify}>Verify & Continue →</Btn>
+                <button onClick={() => { setStep("phone"); setError(""); }} style={{ background: "none", border: "none", color: C.silver, cursor: "pointer", fontSize: 13 }}>← Back</button>
+              </div>
+            )}
+          </>
         )}
       </div>
+
+      {/* Discreet staff link — only shown on client screen */}
+      {mode === "client" && (
+        <button onClick={() => switchMode("staff")} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>
+          Staff login
+        </button>
+      )}
     </div>
   );
 }
