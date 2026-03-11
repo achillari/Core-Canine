@@ -2490,9 +2490,13 @@ function Classes({ currentUser, staff, clients, setClients, classTemplates, setC
 
       {rosterInst && (() => {
         const tmpl = classTemplates.find(t => t.id === rosterInst.templateId);
+        const enrolledClients = clients.filter(c => rosterInst.enrolledIds.includes(c.id));
+        const waitlistedClients = clients.filter(c => rosterInst.waitlist?.includes(c.id));
+        const notInClass = clients.filter(c => !rosterInst.enrolledIds.includes(c.id) && !rosterInst.waitlist?.includes(c.id));
+        const full = enrolledClients.length >= (tmpl?.maxDogs || 6);
         return (
           <Modal wide title={`${tmpl?.name} — Roster`} onClose={() => setRosterInst(null)}>
-            <div style={{ fontSize: 13, color: C.silver, marginBottom: 8 }}>{rosterInst.enrolledIds.length}/{tmpl?.maxDogs} enrolled · {fmt12(rosterInst.time)}</div>
+            <div style={{ fontSize: 13, color: C.silver, marginBottom: 8 }}>{enrolledClients.length}/{tmpl?.maxDogs} enrolled · {fmt12(rosterInst.time)}</div>
             {rosterInst.note && <div style={{ fontSize: 12, color: C.gold, fontStyle: "italic", marginBottom: 8 }}>📝 {rosterInst.note}</div>}
             <div style={{ fontSize: 12, color: C.steel, marginBottom: 16 }}>
               {(rosterInst.meetingDates || []).length > 0
@@ -2500,33 +2504,70 @@ function Classes({ currentUser, staff, clients, setClients, classTemplates, setC
                 : fmtDate(rosterInst.startDate)}
               {rosterInst.skipDates?.length > 0 && <span style={{ color: C.rust, marginLeft: 6 }}>· Skipping {rosterInst.skipDates.map(d => fmtDateShort(d)).join(", ")}</span>}
             </div>
-            <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
-              {clients.map(client => {
-                const isEnrolled = rosterInst.enrolledIds.includes(client.id);
-                const isWaitlisted = rosterInst.waitlist?.includes(client.id);
-                return (
-                  <div key={client.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: isEnrolled ? "#EEF5EE" : isWaitlisted ? "#FFF8EE" : C.cream, borderRadius: 9 }}>
-                    <div>
-                      <div style={{ fontWeight: 700, color: C.obsidian, fontSize: 14 }}>{client.name}</div>
-                      <div style={{ fontSize: 12, color: C.silver }}>🐕 {client.dogs.map(d => d.name).join(", ")}</div>
-                      {isWaitlisted && <Pill color={C.gold} style={{ marginTop: 4 }}>Waitlisted</Pill>}
-                    </div>
-                    <Btn small variant={isEnrolled ? "danger" : isWaitlisted ? "ghost" : "sage"} onClick={() => {
-                      if (isEnrolled) {
+
+            {enrolledClients.length === 0 && waitlistedClients.length === 0 && (
+              <p style={{ color: C.silver, fontSize: 13 }}>No clients enrolled yet.</p>
+            )}
+
+            {enrolledClients.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: C.silver, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Enrolled</div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  {enrolledClients.map(client => (
+                    <div key={client.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#EEF5EE", borderRadius: 9 }}>
+                      <div>
+                        <div style={{ fontWeight: 700, color: C.obsidian, fontSize: 14 }}>{client.name}</div>
+                        <div style={{ fontSize: 12, color: C.silver }}>🐕 {client.dogs.map(d => d.name).join(", ")} · {client.phone}</div>
+                      </div>
+                      <Btn small variant="danger" onClick={() => {
                         const t = classTemplates.find(x => x.id === rosterInst.templateId);
                         if (t?.price > 0) { setRemoveChoice("credit"); setRemoveModal({ client, inst: rosterInst, tmpl: t }); }
                         else { toggleEnroll(rosterInst.id, client.id); setRosterInst(ri => ({ ...ri, enrolledIds: ri.enrolledIds.filter(i => i !== client.id) })); }
-                      } else {
-                        toggleEnroll(rosterInst.id, client.id);
-                        setRosterInst(ri => ({ ...ri, enrolledIds: isWaitlisted ? [...ri.enrolledIds, client.id] : [...ri.enrolledIds, client.id], waitlist: (ri.waitlist || []).filter(i => i !== client.id) }));
-                      }
-                    }}>
-                      {isEnrolled ? "Remove" : isWaitlisted ? "Move to Enrolled" : "Enroll"}
-                    </Btn>
-                  </div>
-                );
-              })}
-            </div>
+                      }}>Remove</Btn>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {waitlistedClients.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: C.silver, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Waitlist</div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  {waitlistedClients.map(client => (
+                    <div key={client.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#FFF8EE", borderRadius: 9 }}>
+                      <div>
+                        <div style={{ fontWeight: 700, color: C.obsidian, fontSize: 14 }}>{client.name}</div>
+                        <div style={{ fontSize: 12, color: C.silver }}>🐕 {client.dogs.map(d => d.name).join(", ")} · {client.phone}</div>
+                        <Pill color={C.gold} style={{ marginTop: 4 }}>Waitlisted</Pill>
+                      </div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        {!full && <Btn small variant="sage" onClick={() => { toggleEnroll(rosterInst.id, client.id); setRosterInst(ri => ({ ...ri, enrolledIds: [...ri.enrolledIds, client.id], waitlist: (ri.waitlist || []).filter(i => i !== client.id) })); }}>Move to Enrolled</Btn>}
+                        <Btn small variant="ghost" onClick={() => { toggleEnroll(rosterInst.id, client.id); setRosterInst(ri => ({ ...ri, waitlist: (ri.waitlist || []).filter(i => i !== client.id) })); }}>Remove</Btn>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {notInClass.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: C.silver, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Add Client</div>
+                <select style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1.5px solid ${C.fog}`, fontSize: 14, fontFamily: "inherit", color: C.obsidian, background: C.white }} onChange={e => {
+                  const clientId = parseInt(e.target.value);
+                  if (!clientId) return;
+                  e.target.value = "";
+                  toggleEnroll(rosterInst.id, clientId);
+                  setRosterInst(ri => ({ ...ri, enrolledIds: full ? ri.enrolledIds : [...ri.enrolledIds, clientId], waitlist: full ? [...(ri.waitlist || []), clientId] : ri.waitlist }));
+                }}>
+                  <option value="">— Select a client to add —</option>
+                  {notInClass.map(c => <option key={c.id} value={c.id}>{c.name} · 🐕 {c.dogs.map(d => d.name).join(", ")}</option>)}
+                </select>
+                {full && <div style={{ fontSize: 12, color: C.gold, marginTop: 6 }}>⚠️ Class is full — adding a client will place them on the waitlist.</div>}
+              </div>
+            )}
+
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <Btn variant="dark" onClick={() => printRoster(rosterInst)}>🖨️ Print Roster</Btn>
               <Btn variant="ghost" onClick={() => setRosterInst(null)}>Close</Btn>
