@@ -41,13 +41,13 @@ const SEED_CLASS_INSTANCES = [
 ];
 
 const SEED_CLIENTS = [
-  { id: 1, name: "Sarah Mitchell", phone: "555-1001", email: "sarah@email.com", address: "42 Maple St, Springfield, VA 22150", joinDate: "2025-11-01", waiverSigned: true,
+  { id: 1, name: "Sarah Mitchell", phone: "555-1001", email: "sarah@email.com", address: "42 Maple St, Springfield, VA 22150", joinDate: "2025-11-01", waiverSigned: true, accountCredit: 0,
     dogs: [{ id: 1, name: "Biscuit", breed: "Golden Retriever", age: 3, sex: "Male", neutered: true, photo: null, notes: "Leash reactive. Great recall off-leash.", birthday: "2022-06-15", docs: [] }] },
-  { id: 2, name: "James Lee", phone: "555-1002", email: "jlee@email.com", address: "88 Oak Run Dr, Alexandria, VA 22304", joinDate: "2026-01-15", waiverSigned: true,
+  { id: 2, name: "James Lee", phone: "555-1002", email: "jlee@email.com", address: "88 Oak Run Dr, Alexandria, VA 22304", joinDate: "2026-01-15", waiverSigned: true, accountCredit: 175,
     dogs: [{ id: 2, name: "Mochi", breed: "Shiba Inu", age: 1, sex: "Female", neutered: false, photo: null, notes: "Puppy — high energy, short attention span.", birthday: "2025-02-10", docs: [] }] },
-  { id: 3, name: "Donna Reyes", phone: "555-1003", email: "donna@email.com", address: "17 Cedar Lane, Burke, VA 22015", joinDate: "2025-08-20", waiverSigned: true,
+  { id: 3, name: "Donna Reyes", phone: "555-1003", email: "donna@email.com", address: "17 Cedar Lane, Burke, VA 22015", joinDate: "2025-08-20", waiverSigned: true, accountCredit: 0,
     dogs: [{ id: 3, name: "Atlas", breed: "German Shepherd", age: 4, sex: "Male", neutered: true, photo: null, notes: "Advanced skills. Competition goals.", birthday: "2021-11-03", docs: [] }] },
-  { id: 4, name: "Kevin Park", phone: "555-1004", email: "kevin@email.com", address: "305 Birchwood Ave, Fairfax, VA 22030", joinDate: "2026-02-01", waiverSigned: false,
+  { id: 4, name: "Kevin Park", phone: "555-1004", email: "kevin@email.com", address: "305 Birchwood Ave, Fairfax, VA 22030", joinDate: "2026-02-01", waiverSigned: false, accountCredit: 0,
     dogs: [{ id: 4, name: "Noodle", breed: "Labradoodle", age: 2, sex: "Male", neutered: true, photo: null, notes: "Jumps on guests. Needs impulse control.", birthday: "2023-09-22", docs: [] }] },
 ];
 
@@ -491,7 +491,7 @@ function Onboarding({ client, onComplete }) {
 }
 
 // ─── CLIENT PORTAL SCREENS ────────────────────────────────────────────────────
-function BookSession({ client, discountCodes, giftCards, staffList, schedule, sessions, onBack, onBooked }) {
+function BookSession({ client, setClient, setClients, discountCodes, giftCards, staffList, schedule, sessions, onBack, onBooked }) {
   const isReturning = !!(client?.name && client?.email && client?.dogs?.length > 0);
   const [step, setStep] = useState(1);
   const [trainer, setTrainer] = useState(null);
@@ -503,6 +503,7 @@ function BookSession({ client, discountCodes, giftCards, staffList, schedule, se
   const [intake, setIntake] = useState({ name: client?.name || "", email: client?.email || "", address: "", issues: "", dogs: client?.dogs?.length > 0 ? client.dogs.map(d => ({ id: d.id, name: d.name, breed: d.breed || "", dob: d.birthday || "", weight: "" })) : [{ id: Date.now(), name: "", breed: "", dob: "", weight: "" }] });
   const [discount, setDiscount] = useState("");
   const [discountApplied, setDiscountApplied] = useState(null);
+  const [useCredit, setUseCredit] = useState(true);
   const [giftCode, setGiftCode] = useState("");
   const [giftApplied, setGiftApplied] = useState(null);
   const [card, setCard] = useState({ number: "", exp: "", cvc: "", name: "" });
@@ -514,12 +515,15 @@ function BookSession({ client, discountCodes, giftCards, staffList, schedule, se
   const checkoutStep = isReturning ? 3 : 4;
   const totalSteps = isReturning ? 3 : 4;
 
+  const availableCredit = client?.accountCredit || 0;
   const calcTotal = () => {
     let t = BASE;
     if (discountApplied) t = discountApplied.type === "percent" ? t * (1 - discountApplied.value / 100) : t - discountApplied.value;
     if (giftApplied) t = Math.max(0, t - giftApplied.balance);
+    if (useCredit && availableCredit > 0) t = Math.max(0, t - availableCredit);
     return Math.max(0, t);
   };
+  const creditUsed = () => useCredit && availableCredit > 0 ? Math.min(availableCredit, (() => { let t = BASE; if (discountApplied) t = discountApplied.type === "percent" ? t * (1 - discountApplied.value / 100) : t - discountApplied.value; if (giftApplied) t = Math.max(0, t - giftApplied.balance); return t; })()) : 0;
 
   const getAvailableTimes = (dateStr) => {
     if (!trainer || !dateStr) return [];
@@ -687,10 +691,20 @@ function BookSession({ client, discountCodes, giftCards, staffList, schedule, se
             <div style={{ fontSize: 13, color: C.silver, marginBottom: 8 }}>{fmtDate(selectedDate)} · {fmt12(selectedTime)} · with {trainer?.name}</div>
             {discountApplied && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.sage }}><span>Discount ({discountApplied.code})</span><span>-{discountApplied.type === "percent" ? `${discountApplied.value}%` : `$${discountApplied.value}`}</span></div>}
             {giftApplied && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.sage }}><span>Gift Card</span><span>-${Math.min(giftApplied.balance, BASE)}</span></div>}
+            {useCredit && creditUsed() > 0 && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.sky }}><span>💳 Account Credit</span><span>-${creditUsed().toFixed(2)}</span></div>}
             <div style={{ borderTop: `1px solid ${C.fog}`, marginTop: 10, paddingTop: 10, display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: 16 }}>
               <span>Total</span><span style={{ color: C.gold }}>${calcTotal().toFixed(2)}</span>
             </div>
           </Card>
+          {availableCredit > 0 && (
+            <label onClick={() => setUseCredit(u => !u)} style={{ display: "flex", gap: 10, alignItems: "center", padding: "12px 16px", borderRadius: 12, border: `2px solid ${useCredit ? C.sky : C.fog}`, background: useCredit ? C.sky + "0D" : C.white, cursor: "pointer" }}>
+              <input type="checkbox" checked={useCredit} onChange={() => setUseCredit(u => !u)} />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: C.obsidian }}>💳 Apply account credit</div>
+                <div style={{ fontSize: 12, color: C.silver }}>You have <b style={{ color: C.sky }}>${availableCredit.toFixed(2)}</b> in credit · {useCredit ? `$${creditUsed().toFixed(2)} will be applied` : "Not applying"}</div>
+              </div>
+            </label>
+          )}
           <div style={{ display: "flex", gap: 8 }}>
             <input style={{ ...inputStyle, flex: 1 }} placeholder="Discount code" value={discount} onChange={e => setDiscount(e.target.value)} />
             <Btn variant="ghost" small onClick={() => { const f = discountCodes.find(d => d.code === discount.toUpperCase() && d.active); if (f) setDiscountApplied(f); else alert("Code not found."); }}>Apply</Btn>
@@ -715,7 +729,15 @@ function BookSession({ client, discountCodes, giftCards, staffList, schedule, se
           )}
           <div style={{ display: "flex", gap: 10 }}>
             <Btn variant="ghost" onClick={() => setStep(isReturning ? 2 : intakeStep)}>← Back</Btn>
-            <Btn full variant="sage" onClick={() => { setBooked(true); onBooked && onBooked({ type: "session", trainer, date: selectedDate, time: selectedTime, sessionType, price: calcTotal() }); }}>Confirm & Pay ${calcTotal().toFixed(2)}</Btn>
+            <Btn full variant="sage" onClick={() => {
+              const used = creditUsed();
+              if (used > 0) {
+                if (setClient) setClient(c => ({ ...c, accountCredit: Math.max(0, (c.accountCredit || 0) - used) }));
+                if (setClients) setClients(cs => cs.map(c => c.id === client.id ? { ...c, accountCredit: Math.max(0, (c.accountCredit || 0) - used) } : c));
+              }
+              setBooked(true);
+              onBooked && onBooked({ type: "session", trainer, date: selectedDate, time: selectedTime, sessionType, price: calcTotal() });
+            }}>Confirm & Pay ${calcTotal().toFixed(2)}</Btn>
           </div>
         </div>
       )}
@@ -723,7 +745,7 @@ function BookSession({ client, discountCodes, giftCards, staffList, schedule, se
   );
 }
 
-function BookClass({ client, discountCodes, giftCards, classTemplates, classInstances, staffList, onBack, onBooked }) {
+function BookClass({ client, setClient, setClients, discountCodes, giftCards, classTemplates, classInstances, staffList, onBack, onBooked }) {
   const isReturning = !!(client?.name && client?.email && client?.dogs?.length > 0);
   const [selected, setSelected] = useState(null);
   const [step, setStep] = useState(1);
@@ -733,6 +755,7 @@ function BookClass({ client, discountCodes, giftCards, classTemplates, classInst
   const [discountApplied, setDiscountApplied] = useState(null);
   const [giftCode, setGiftCode] = useState("");
   const [giftApplied, setGiftApplied] = useState(null);
+  const [useCredit, setUseCredit] = useState(true);
   const [card, setCard] = useState({ number: "", exp: "", cvc: "", name: "" });
   const [booked, setBooked] = useState(false);
   const vaccineRefs = useRef({});
@@ -742,14 +765,17 @@ function BookClass({ client, discountCodes, giftCards, classTemplates, classInst
 
   const tmpl = selected ? classTemplates.find(t => t.id === selected.templateId) : null;
   const instructor = selected ? staffList.find(s => s.id === selected.instructorId) : null;
+  const availableCredit = client?.accountCredit || 0;
 
-  const calcTotal = () => {
+  const calcPreCredit = () => {
     if (!tmpl) return 0;
     let t = tmpl.price;
     if (discountApplied) t = discountApplied.type === "percent" ? t * (1 - discountApplied.value / 100) : t - discountApplied.value;
     if (giftApplied) t = Math.max(0, t - giftApplied.balance);
     return Math.max(0, t);
   };
+  const creditUsed = () => useCredit && availableCredit > 0 ? Math.min(availableCredit, calcPreCredit()) : 0;
+  const calcTotal = () => Math.max(0, calcPreCredit() - creditUsed());
 
   const addIntakeDog = () => setIntake(f => ({ ...f, dogs: [...f.dogs, { id: Date.now(), name: "", breed: "", dob: "", weight: "", vaccineDoc: null }] }));
   const removeIntakeDog = id => setIntake(f => ({ ...f, dogs: f.dogs.filter(d => d.id !== id) }));
@@ -887,10 +913,20 @@ function BookClass({ client, discountCodes, giftCards, classTemplates, classInst
               {full && <div style={{ marginTop: 10, background: C.sky + "22", borderRadius: 8, padding: "8px 12px", fontSize: 13, color: C.sky }}>This class is full — you'll join the waitlist.</div>}
               {discountApplied && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.sage, marginTop: 6 }}><span>Discount ({discountApplied.code})</span><span>-{discountApplied.type === "percent" ? `${discountApplied.value}%` : `$${discountApplied.value}`}</span></div>}
               {giftApplied && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.sage }}><span>Gift Card</span><span>-${Math.min(giftApplied.balance, tmpl?.price || 0)}</span></div>}
+              {useCredit && creditUsed() > 0 && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.sky }}><span>💳 Account Credit</span><span>-${creditUsed().toFixed(2)}</span></div>}
               <div style={{ borderTop: `1px solid ${C.fog}`, marginTop: 12, paddingTop: 12, display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: 16 }}>
                 <span>Total</span><span style={{ color: C.gold }}>${calcTotal().toFixed(2)}</span>
               </div>
             </Card>
+            {availableCredit > 0 && (
+              <label onClick={() => setUseCredit(u => !u)} style={{ display: "flex", gap: 10, alignItems: "center", padding: "12px 16px", borderRadius: 12, border: `2px solid ${useCredit ? C.sky : C.fog}`, background: useCredit ? C.sky + "0D" : C.white, cursor: "pointer" }}>
+                <input type="checkbox" checked={useCredit} onChange={() => setUseCredit(u => !u)} />
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: C.obsidian }}>💳 Apply account credit</div>
+                  <div style={{ fontSize: 12, color: C.silver }}>You have <b style={{ color: C.sky }}>${availableCredit.toFixed(2)}</b> in credit · {useCredit ? `$${creditUsed().toFixed(2)} will be applied` : "Not applying"}</div>
+                </div>
+              </label>
+            )}
             <div style={{ display: "flex", gap: 8 }}>
               <input style={{ ...inputStyle, flex: 1 }} placeholder="Discount code" value={discount} onChange={e => setDiscount(e.target.value)} />
               <Btn variant="ghost" small onClick={() => { const f = discountCodes.find(d => d.code === discount.toUpperCase() && d.active); if (f) setDiscountApplied(f); else alert("Code not found."); }}>Apply</Btn>
@@ -915,7 +951,15 @@ function BookClass({ client, discountCodes, giftCards, classTemplates, classInst
             )}
             <div style={{ display: "flex", gap: 10 }}>
               <Btn variant="ghost" onClick={() => setStep(isReturning ? 1 : intakeStep)}>← Back</Btn>
-              <Btn full variant="sage" onClick={() => { setBooked(true); onBooked && onBooked({ type: "class", instance: selected }); }}>{full ? "Join Waitlist" : "Enroll & Pay $" + calcTotal().toFixed(2)}</Btn>
+              <Btn full variant="sage" onClick={() => {
+                const used = creditUsed();
+                if (used > 0) {
+                  if (setClient) setClient(c => ({ ...c, accountCredit: Math.max(0, (c.accountCredit || 0) - used) }));
+                  if (setClients) setClients(cs => cs.map(c => c.id === client.id ? { ...c, accountCredit: Math.max(0, (c.accountCredit || 0) - used) } : c));
+                }
+                setBooked(true);
+                onBooked && onBooked({ type: "class", instance: selected });
+              }}>{full ? "Join Waitlist" : "Enroll & Pay $" + calcTotal().toFixed(2)}</Btn>
             </div>
           </div>
         );
@@ -924,22 +968,31 @@ function BookClass({ client, discountCodes, giftCards, classTemplates, classInst
   );
 }
 
-function MyBookings({ bookings, setBookings, staffList, schedule, classInstances, setClassInstances, classTemplates, client, setPromotionLog }) {
+function MyBookings({ bookings, setBookings, staffList, schedule, classInstances, setClassInstances, classTemplates, client, setClient, setClients, setPromotionLog }) {
   const [rescheduleItem, setRescheduleItem] = useState(null);
   const [newDate, setNewDate] = useState("");
   const [newTime, setNewTime] = useState("");
   const [showReview, setShowReview] = useState(null);
   const [promotionNotices, setPromotionNotices] = useState([]);
+  const [cancelModal, setCancelModal] = useState(null); // { booking }
+  const [cancelChoice, setCancelChoice] = useState("credit"); // "credit" | "refund"
   const canResched = ds => hoursUntil(ds) > 72;
   const canRefund = ds => hoursUntil(ds) > 72;
   const sessions = bookings.filter(b => b.bookingType === "session");
   const classes = bookings.filter(b => b.bookingType === "class");
 
-  const cancelIt = (id, ds) => {
-    const refund = canRefund(ds);
-    if (window.confirm(refund ? "Cancel session? You'll receive a full refund." : "Cancel session? Within 72 hours — no refund per cancellation policy.")) {
-      setBookings(bs => bs.map(b => b.id === id ? { ...b, status: "cancelled", refunded: refund } : b));
-    }
+  const addCredit = (amount) => {
+    if (!client) return;
+    if (setClient) setClient(c => ({ ...c, accountCredit: (c.accountCredit || 0) + amount }));
+    if (setClients) setClients(cs => cs.map(c => c.id === client.id ? { ...c, accountCredit: (c.accountCredit || 0) + amount } : c));
+  };
+
+  const confirmCancel = () => {
+    const b = cancelModal;
+    if (!b) return;
+    if (cancelChoice === "credit" && b.price > 0) addCredit(b.price);
+    setBookings(bs => bs.map(x => x.id === b.id ? { ...x, status: "cancelled", refunded: cancelChoice === "refund", creditApplied: cancelChoice === "credit" } : x));
+    setCancelModal(null);
   };
 
   const cancelFreeClass = (booking) => {
@@ -990,7 +1043,7 @@ function MyBookings({ bookings, setBookings, staffList, schedule, classInstances
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       {!past && b.status !== "cancelled" && <>
                         {canResched(b.date) && <Btn small variant="sky" onClick={() => { setRescheduleItem(b); setNewDate(b.date); setNewTime(b.time); }}>Reschedule</Btn>}
-                        <Btn small variant={canRefund(b.date) ? "ghost" : "danger"} onClick={() => cancelIt(b.id, b.date)}>{canRefund(b.date) ? "Cancel" : "Cancel (No Refund)"}</Btn>
+                        <Btn small variant={canRefund(b.date) ? "ghost" : "danger"} onClick={() => { setCancelChoice(canRefund(b.date) ? "credit" : "none"); setCancelModal(b); }}>{canRefund(b.date) ? "Cancel" : "Cancel (No Refund)"}</Btn>
                       </>}
                       {b.date < today && b.status !== "cancelled" && !b.reviewRequested && (
                         <Btn small variant="dark" onClick={() => setShowReview(b)}>⭐ Review</Btn>
@@ -1003,6 +1056,39 @@ function MyBookings({ bookings, setBookings, staffList, schedule, classInstances
           </div>
         </div>
       )}
+      {cancelModal && (
+        <Modal title="Cancel Session" onClose={() => setCancelModal(null)}>
+          <div style={{ display: "grid", gap: 16 }}>
+            <div style={{ fontSize: 14, color: C.obsidian }}>
+              Cancelling: <b>{fmtDate(cancelModal.date)} · {fmt12(cancelModal.time)}</b> with {cancelModal.trainerName}
+            </div>
+            {cancelModal.price > 0 && canRefund(cancelModal.date) ? (
+              <div style={{ display: "grid", gap: 10 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: C.obsidian, marginBottom: 4 }}>What would you like to do with your ${cancelModal.price}?</div>
+                {[
+                  { value: "credit", label: "💳 Keep as account credit", desc: `$${cancelModal.price} will be added to your account to use on a future booking` },
+                  { value: "refund", label: "↩️ Request a refund", desc: "A refund will be processed back to your original payment method" },
+                ].map(opt => (
+                  <label key={opt.value} onClick={() => setCancelChoice(opt.value)} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "12px 14px", borderRadius: 10, border: `2px solid ${cancelChoice === opt.value ? C.gold : C.fog}`, background: cancelChoice === opt.value ? C.gold + "0D" : C.white, cursor: "pointer" }}>
+                    <input type="radio" checked={cancelChoice === opt.value} onChange={() => setCancelChoice(opt.value)} style={{ marginTop: 2 }} />
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: C.obsidian }}>{opt.label}</div>
+                      <div style={{ fontSize: 12, color: C.silver, marginTop: 2 }}>{opt.desc}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontSize: 13, color: C.rust }}>⚠️ This session is within 72 hours — it is non-refundable per our cancellation policy.</div>
+            )}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <Btn variant="ghost" onClick={() => setCancelModal(null)}>Keep Booking</Btn>
+              <Btn variant="danger" onClick={confirmCancel}>Confirm Cancellation</Btn>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {promotionNotices.length > 0 && promotionNotices.map(n => (
         <div key={n.id} style={{ background: C.sage + "22", border: `1px solid ${C.sage}`, borderRadius: 12, padding: "12px 16px", marginBottom: 12, fontSize: 14, color: C.sage, fontWeight: 700 }}>
           🎉 Great news! A spot opened up in <b>{n.className}</b> and you've been moved off the waitlist — you're now enrolled!
@@ -1109,6 +1195,16 @@ function MyAccount({ client, setClient }) {
   return (
     <div>
       <h2 style={{ fontFamily: "Georgia, serif", color: C.obsidian, marginBottom: 20 }}>My Account</h2>
+      {(client.accountCredit || 0) > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 14, background: `linear-gradient(135deg, ${C.sky}18, ${C.sky}08)`, border: `2px solid ${C.sky}`, borderRadius: 14, padding: "16px 20px", marginBottom: 20 }}>
+          <div style={{ fontSize: 32 }}>💳</div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.sky, textTransform: "uppercase", letterSpacing: 0.5 }}>Account Credit</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: C.obsidian }}>${(client.accountCredit).toFixed(2)}</div>
+            <div style={{ fontSize: 12, color: C.silver, marginTop: 2 }}>Automatically applied at checkout · never expires</div>
+          </div>
+        </div>
+      )}
       <Card style={{ marginBottom: 20 }}>
         <h3 style={{ fontFamily: "Georgia, serif", marginTop: 0, fontSize: 16 }}>Contact Info</h3>
         {[["Name", client.name], ["Email", client.email], ["Phone", client.phone], ["Waiver", client.waiverSigned ? "✓ Signed" : "Pending"]].map(([l, v]) => (
@@ -1271,7 +1367,7 @@ function ClientHome({ client, classInstances, classTemplates, staffList, setPage
 }
 
 // ─── CLIENT PORTAL WRAPPER ────────────────────────────────────────────────────
-function ClientPortal({ client, setClient, onSignOut, staff, sessions, classTemplates, classInstances, setClassInstances, discountCodes, giftCards, messages, setMessages, schedule, setPromotionLog }) {
+function ClientPortal({ client, setClient, onSignOut, staff, sessions, classTemplates, classInstances, setClassInstances, discountCodes, giftCards, messages, setMessages, schedule, setPromotionLog, clients, setClients }) {
   const [page, setPage] = useState("home");
   const [bookings, setBookings] = useState([
     { id: 1, bookingType: "session", trainerId: 1, trainerName: "Core Canine Owner", date: "2026-04-02", time: "10:00", sessionType: "facility", price: 90, status: "confirmed" },
@@ -1291,7 +1387,7 @@ function ClientPortal({ client, setClient, onSignOut, staff, sessions, classTemp
     setPage("bookings");
   };
 
-  const sharedProps = { client, discountCodes, giftCards, staffList: staff, schedule, sessions, classTemplates, classInstances };
+  const sharedProps = { client, setClient, setClients, discountCodes, giftCards, staffList: staff, schedule, sessions, classTemplates, classInstances };
 
   return (
     <div style={{ minHeight: "100vh", background: C.cream, fontFamily: "Georgia, serif", paddingBottom: 80 }}>
@@ -1312,7 +1408,7 @@ function ClientPortal({ client, setClient, onSignOut, staff, sessions, classTemp
         {page === "home" && <ClientHome client={client} classInstances={classInstances} classTemplates={classTemplates} staffList={staff} setPage={setPage} />}
         {page === "book-session" && <BookSession {...sharedProps} onBack={() => setPage("home")} onBooked={handleBooked} />}
         {page === "book-class" && <BookClass {...sharedProps} onBack={() => setPage("home")} onBooked={handleBooked} />}
-        {page === "bookings" && <MyBookings bookings={bookings} setBookings={setBookings} staffList={staff} schedule={schedule} classInstances={classInstances} setClassInstances={setClassInstances} classTemplates={classTemplates} client={client} setPromotionLog={setPromotionLog} />}
+        {page === "bookings" && <MyBookings bookings={bookings} setBookings={setBookings} staffList={staff} schedule={schedule} classInstances={classInstances} setClassInstances={setClassInstances} classTemplates={classTemplates} client={client} setClient={setClient} setClients={setClients} setPromotionLog={setPromotionLog} />}
         {page === "messages" && <ClientMessages client={client} messages={messages} setMessages={setMessages} staffList={staff} />}
         {page === "account" && <MyAccount client={client} setClient={setClient} />}
       </div>
@@ -1461,6 +1557,15 @@ function ClientDetailModal({ client, sessions, dogNotes, setDogNotes, currentUse
       </div>
       {activeTab === "info" && (
         <div style={{ display: "grid", gap: 10 }}>
+          {(client.accountCredit || 0) > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, background: C.sky + "15", border: `1.5px solid ${C.sky}`, borderRadius: 10, padding: "10px 14px" }}>
+              <span style={{ fontSize: 20 }}>💳</span>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.sky, textTransform: "uppercase", letterSpacing: 0.5 }}>Account Credit</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: C.obsidian }}>${(client.accountCredit).toFixed(2)}</div>
+              </div>
+            </div>
+          )}
           {[["Name", client.name], ["Phone", client.phone], ["Email", client.email], ["Joined", fmtDate(client.joinDate)], ["Waiver", client.waiverSigned ? "Signed" : "Not signed"]].map(([l, v]) => (
             <div key={l}><b style={{ color: C.obsidian }}>{l}:</b> <span style={{ color: C.steel }}>{v}</span></div>
           ))}
@@ -1514,6 +1619,8 @@ function CalendarView({ currentUser, staff, clients, sessions, classInstances, c
   const [blockForm, setBlockForm] = useState({ startDate: "", endDate: "", reason: "" });
   const [showIcalModal, setShowIcalModal] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
+  const [adminCancelModal, setAdminCancelModal] = useState(null); // session object
+  const [adminCancelChoice, setAdminCancelChoice] = useState("credit");
 
   const isAdmin = currentUser.role === "admin";
 
@@ -1777,6 +1884,51 @@ function CalendarView({ currentUser, staff, clients, sessions, classInstances, c
       })()}
 
       {/* Client detail modal */}
+      {adminCancelModal && (() => {
+        const s = adminCancelModal;
+        const client = clients.find(c => c.id === s.clientId);
+        const trainer = staff.find(t => t.id === s.trainerId);
+        return (
+          <Modal title="Cancel Session" onClose={() => setAdminCancelModal(null)}>
+            <div style={{ display: "grid", gap: 16 }}>
+              <div style={{ fontSize: 14, color: C.obsidian }}>
+                Cancelling <b>{client?.name}</b>'s session on <b>{fmtDate(s.date)} · {fmt12(s.time)}</b> with {trainer?.name}
+              </div>
+              {s.paid && s.price > 0 ? (
+                <div style={{ display: "grid", gap: 10 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.obsidian, marginBottom: 4 }}>What would you like to do with the ${s.price} payment?</div>
+                  {[
+                    { value: "credit", label: "💳 Keep as account credit", desc: `$${s.price} will be added to ${client?.name}'s account for a future booking` },
+                    { value: "refund", label: "↩️ Issue a refund", desc: "Mark a refund for this session" },
+                    { value: "none", label: "🚫 No action", desc: "Cancel without any payment adjustment" },
+                  ].map(opt => (
+                    <label key={opt.value} onClick={() => setAdminCancelChoice(opt.value)} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "12px 14px", borderRadius: 10, border: `2px solid ${adminCancelChoice === opt.value ? C.gold : C.fog}`, background: adminCancelChoice === opt.value ? C.gold + "0D" : C.white, cursor: "pointer" }}>
+                      <input type="radio" checked={adminCancelChoice === opt.value} onChange={() => setAdminCancelChoice(opt.value)} style={{ marginTop: 2 }} />
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: C.obsidian }}>{opt.label}</div>
+                        <div style={{ fontSize: 12, color: C.silver, marginTop: 2 }}>{opt.desc}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ fontSize: 13, color: C.silver }}>{s.paid ? "" : "⚠️ This session has not been paid — no payment action needed."}</div>
+              )}
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                <Btn variant="ghost" onClick={() => setAdminCancelModal(null)}>Keep Session</Btn>
+                <Btn variant="danger" onClick={() => {
+                  if (adminCancelChoice === "credit" && client && s.price > 0) {
+                    setClients(cs => cs.map(c => c.id === client.id ? { ...c, accountCredit: (c.accountCredit || 0) + s.price } : c));
+                  }
+                  setSessions(ss => ss.map(x => x.id === s.id ? { ...x, status: "cancelled", refunded: adminCancelChoice === "refund", creditApplied: adminCancelChoice === "credit" } : x));
+                  setAdminCancelModal(null);
+                }}>Confirm Cancellation</Btn>
+              </div>
+            </div>
+          </Modal>
+        );
+      })()}
+
       {selectedClient && <ClientDetailModal client={selectedClient} sessions={sessions} dogNotes={dogNotes} setDogNotes={setDogNotes} currentUser={currentUser} onClose={() => setSelectedClient(null)} />}
 
       {/* Blocked dates list */}
@@ -1947,7 +2099,7 @@ function ScheduleManager({ currentUser, schedule, setSchedule, oneOffSlots, setO
   );
 }
 
-function Sessions({ currentUser, staff, clients, sessions, setSessions, schedule, oneOffSlots, dogNotes, setDogNotes }) {
+function Sessions({ currentUser, staff, clients, setClients, sessions, setSessions, schedule, oneOffSlots, dogNotes, setDogNotes }) {
   const [filter, setFilter] = useState("upcoming");
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState(null);
@@ -2027,7 +2179,7 @@ function Sessions({ currentUser, staff, clients, sessions, setSessions, schedule
                     <Btn small variant="ghost" onClick={() => { setEditItem(s); setForm({ ...s, clientId: String(s.clientId), trainerId: String(s.trainerId) }); setShowModal(true); }}>Edit</Btn>
                     <Btn small variant={reminderSent.includes(s.id) ? "ghost" : "sky"} onClick={() => setReminderSent(p => [...p, s.id])} disabled={reminderSent.includes(s.id)}>{reminderSent.includes(s.id) ? "✓ Reminded" : "📱 Remind"}</Btn>
                     {s.status === "completed" && <Btn small variant={reviewSent.includes(s.id) ? "ghost" : "dark"} onClick={() => setReviewSent(p => [...p, s.id])} disabled={reviewSent.includes(s.id)}>{reviewSent.includes(s.id) ? "✓ Review Sent" : "⭐ Request Review"}</Btn>}
-                    <Btn small variant="danger" onClick={() => { if (window.confirm("Cancel this session?")) setSessions(ss => ss.map(x => x.id === s.id ? { ...x, status: "cancelled" } : x)); }}>Cancel</Btn>
+                    <Btn small variant="danger" onClick={() => { setAdminCancelChoice(s.paid ? "credit" : "none"); setAdminCancelModal(s); }}>Cancel</Btn>
                   </>}
                 </div>
               </div>
@@ -2036,6 +2188,51 @@ function Sessions({ currentUser, staff, clients, sessions, setSessions, schedule
         })}
         {filtered.length === 0 && <p style={{ color: C.silver }}>No sessions found.</p>}
       </div>
+
+      {adminCancelModal && (() => {
+        const s = adminCancelModal;
+        const client = clients.find(c => c.id === s.clientId);
+        const trainer = staff.find(t => t.id === s.trainerId);
+        return (
+          <Modal title="Cancel Session" onClose={() => setAdminCancelModal(null)}>
+            <div style={{ display: "grid", gap: 16 }}>
+              <div style={{ fontSize: 14, color: C.obsidian }}>
+                Cancelling <b>{client?.name}</b>'s session on <b>{fmtDate(s.date)} · {fmt12(s.time)}</b> with {trainer?.name}
+              </div>
+              {s.paid && s.price > 0 ? (
+                <div style={{ display: "grid", gap: 10 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.obsidian, marginBottom: 4 }}>What would you like to do with the ${s.price} payment?</div>
+                  {[
+                    { value: "credit", label: "💳 Keep as account credit", desc: `$${s.price} will be added to ${client?.name}'s account for a future booking` },
+                    { value: "refund", label: "↩️ Issue a refund", desc: "Mark a refund for this session" },
+                    { value: "none", label: "🚫 No action", desc: "Cancel without any payment adjustment" },
+                  ].map(opt => (
+                    <label key={opt.value} onClick={() => setAdminCancelChoice(opt.value)} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "12px 14px", borderRadius: 10, border: `2px solid ${adminCancelChoice === opt.value ? C.gold : C.fog}`, background: adminCancelChoice === opt.value ? C.gold + "0D" : C.white, cursor: "pointer" }}>
+                      <input type="radio" checked={adminCancelChoice === opt.value} onChange={() => setAdminCancelChoice(opt.value)} style={{ marginTop: 2 }} />
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: C.obsidian }}>{opt.label}</div>
+                        <div style={{ fontSize: 12, color: C.silver, marginTop: 2 }}>{opt.desc}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ fontSize: 13, color: C.silver }}>⚠️ This session has not been paid — no payment action needed.</div>
+              )}
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                <Btn variant="ghost" onClick={() => setAdminCancelModal(null)}>Keep Session</Btn>
+                <Btn variant="danger" onClick={() => {
+                  if (adminCancelChoice === "credit" && client && s.price > 0) {
+                    setClients(cs => cs.map(c => c.id === client.id ? { ...c, accountCredit: (c.accountCredit || 0) + s.price } : c));
+                  }
+                  setSessions(ss => ss.map(x => x.id === s.id ? { ...x, status: "cancelled", refunded: adminCancelChoice === "refund", creditApplied: adminCancelChoice === "credit" } : x));
+                  setAdminCancelModal(null);
+                }}>Confirm Cancellation</Btn>
+              </div>
+            </div>
+          </Modal>
+        );
+      })()}
 
       {selectedClient && <ClientDetailModal client={selectedClient} sessions={sessions} dogNotes={dogNotes} setDogNotes={setDogNotes} currentUser={currentUser} onClose={() => setSelectedClient(null)} />}
 
@@ -2081,13 +2278,15 @@ function Sessions({ currentUser, staff, clients, sessions, setSessions, schedule
   );
 }
 
-function Classes({ currentUser, staff, clients, classTemplates, setClassTemplates, classInstances, setClassInstances, promotionLog, setPromotionLog }) {
+function Classes({ currentUser, staff, clients, setClients, classTemplates, setClassTemplates, classInstances, setClassInstances, promotionLog, setPromotionLog }) {
   const [view, setView] = useState("instances");
   const [showTmplModal, setShowTmplModal] = useState(false);
   const [showInstModal, setShowInstModal] = useState(false);
   const [editTmpl, setEditTmpl] = useState(null);
   const [editInst, setEditInst] = useState(null);
   const [rosterInst, setRosterInst] = useState(null);
+  const [removeModal, setRemoveModal] = useState(null); // { client, inst, tmpl }
+  const [removeChoice, setRemoveChoice] = useState("credit");
   const [tmplForm, setTmplForm] = useState({ name: "", weeks: 4, maxDogs: 6, price: 150, description: "", waitlistEnabled: false, freeClass: false });
   const [instForm, setInstForm] = useState({ templateId: "", instructorId: String(currentUser.id), startDate: "", time: "", duration: 60, note: "", skipDates: [] });
 
@@ -2291,7 +2490,16 @@ function Classes({ currentUser, staff, clients, classTemplates, setClassTemplate
                       <div style={{ fontSize: 12, color: C.silver }}>🐕 {client.dogs.map(d => d.name).join(", ")}</div>
                       {isWaitlisted && <Pill color={C.gold} style={{ marginTop: 4 }}>Waitlisted</Pill>}
                     </div>
-                    <Btn small variant={isEnrolled ? "danger" : isWaitlisted ? "ghost" : "sage"} onClick={() => { toggleEnroll(rosterInst.id, client.id); setRosterInst(ri => ({ ...ri, enrolledIds: isEnrolled ? ri.enrolledIds.filter(i => i !== client.id) : [...ri.enrolledIds, client.id], waitlist: (ri.waitlist || []).filter(i => i !== client.id) })); }}>
+                    <Btn small variant={isEnrolled ? "danger" : isWaitlisted ? "ghost" : "sage"} onClick={() => {
+                      if (isEnrolled) {
+                        const t = classTemplates.find(x => x.id === rosterInst.templateId);
+                        if (t?.price > 0) { setRemoveChoice("credit"); setRemoveModal({ client, inst: rosterInst, tmpl: t }); }
+                        else { toggleEnroll(rosterInst.id, client.id); setRosterInst(ri => ({ ...ri, enrolledIds: ri.enrolledIds.filter(i => i !== client.id) })); }
+                      } else {
+                        toggleEnroll(rosterInst.id, client.id);
+                        setRosterInst(ri => ({ ...ri, enrolledIds: isWaitlisted ? [...ri.enrolledIds, client.id] : [...ri.enrolledIds, client.id], waitlist: (ri.waitlist || []).filter(i => i !== client.id) }));
+                      }
+                    }}>
                       {isEnrolled ? "Remove" : isWaitlisted ? "Move to Enrolled" : "Enroll"}
                     </Btn>
                   </div>
@@ -2305,6 +2513,44 @@ function Classes({ currentUser, staff, clients, classTemplates, setClassTemplate
           </Modal>
         );
       })()}
+
+      {removeModal && (
+        <Modal title="Remove Client from Class" onClose={() => setRemoveModal(null)}>
+          <div style={{ display: "grid", gap: 16 }}>
+            <div style={{ fontSize: 14, color: C.obsidian }}>
+              Removing <b>{removeModal.client.name}</b> from <b>{removeModal.tmpl.name}</b>
+            </div>
+            <div style={{ display: "grid", gap: 10 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.obsidian, marginBottom: 4 }}>What would you like to do with the ${removeModal.tmpl.price} payment?</div>
+              {[
+                { value: "credit", label: "💳 Keep as account credit", desc: `$${removeModal.tmpl.price} will be added to ${removeModal.client.name}'s account for a future booking` },
+                { value: "refund", label: "↩️ Issue a refund", desc: "Mark a refund for this client's payment" },
+                { value: "none", label: "🚫 No action", desc: "Remove the client without any payment adjustment" },
+              ].map(opt => (
+                <label key={opt.value} onClick={() => setRemoveChoice(opt.value)} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "12px 14px", borderRadius: 10, border: `2px solid ${removeChoice === opt.value ? C.gold : C.fog}`, background: removeChoice === opt.value ? C.gold + "0D" : C.white, cursor: "pointer" }}>
+                  <input type="radio" checked={removeChoice === opt.value} onChange={() => setRemoveChoice(opt.value)} style={{ marginTop: 2 }} />
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: C.obsidian }}>{opt.label}</div>
+                    <div style={{ fontSize: 12, color: C.silver, marginTop: 2 }}>{opt.desc}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <Btn variant="ghost" onClick={() => setRemoveModal(null)}>Cancel</Btn>
+              <Btn variant="danger" onClick={() => {
+                const { client, inst, tmpl } = removeModal;
+                if (removeChoice === "credit") {
+                  setClients(cs => cs.map(c => c.id === client.id ? { ...c, accountCredit: (c.accountCredit || 0) + tmpl.price } : c));
+                }
+                toggleEnroll(inst.id, client.id);
+                setRosterInst(ri => ri ? ({ ...ri, enrolledIds: ri.enrolledIds.filter(i => i !== client.id) }) : ri);
+                setRemoveModal(null);
+              }}>Confirm Removal</Btn>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {showTmplModal && (
         <Modal title={editTmpl ? "Edit Class Template" : "New Class Template"} onClose={() => setShowTmplModal(false)}>
@@ -2450,6 +2696,15 @@ function Clients({ currentUser, clients, setClients, sessions, dogNotes, setDogN
             </div>
             {activeTab === "info" && (
               <div style={{ display: "grid", gap: 10 }}>
+                {(selected.accountCredit || 0) > 0 && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, background: C.sky + "15", border: `1.5px solid ${C.sky}`, borderRadius: 10, padding: "10px 14px" }}>
+                    <span style={{ fontSize: 20 }}>💳</span>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: C.sky, textTransform: "uppercase", letterSpacing: 0.5 }}>Account Credit</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: C.obsidian }}>${(selected.accountCredit).toFixed(2)}</div>
+                    </div>
+                  </div>
+                )}
                 {[["Name", selected.name], ["Phone", selected.phone], ["Email", selected.email], ["Joined", fmtDate(selected.joinDate)], ["Waiver", selected.waiverSigned ? "Signed" : "Not signed"]].map(([l, v]) => (
                   <div key={l}><b style={{ color: C.obsidian }}>{l}:</b> <span style={{ color: C.steel }}>{v}</span></div>
                 ))}
@@ -3500,6 +3755,8 @@ export default function App() {
         classTemplates={classTemplates}
         classInstances={classInstances}
         setClassInstances={setClassInstances}
+        clients={clients}
+        setClients={setClients}
         discountCodes={discountCodes}
         giftCards={giftCards}
         messages={messages}
