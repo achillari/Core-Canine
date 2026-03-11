@@ -522,11 +522,12 @@ function BookSession({ client, discountCodes, giftCards, staffList, schedule, on
   const getDates = () => {
     if (!trainer) return [];
     const key = sessionType === "facility" ? "facility" : "inHome";
-    const availDays = Object.keys(schedule[trainer.id]?.[key] || {});
+    const daySlots = schedule[trainer.id]?.[key] || {};
     const dates = [];
     for (let i = 1; i <= 35; i++) {
       const d = new Date(); d.setDate(d.getDate() + i);
-      if (availDays.includes(d.toLocaleDateString("en-US", { weekday: "long" }))) dates.push(d.toISOString().slice(0, 10));
+      const dayName = d.toLocaleDateString("en-US", { weekday: "long" });
+      if (daySlots[dayName]?.length > 0) dates.push(d.toISOString().slice(0, 10));
     }
     return dates.slice(0, 20);
   };
