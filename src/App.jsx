@@ -110,6 +110,17 @@ const SEED_EMAIL_TEMPLATES = [
   { id: 4, name: "Homework Follow-Up", subject: "Your homework from today's session 🐾", body: "Hi {{clientName}},\n\nGreat work today! Here are the exercises we covered. Practice a little every day — short sessions work best.\n\n{{homeworkList}}\n\nQuestions? Reply to this email anytime.\n\n— {{trainerName}}", active: true },
 ];
 
+// ─── MOBILE HOOK ──────────────────────────────────────────────────────────────
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(typeof window !== "undefined" && window.innerWidth < 768);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+  return isMobile;
+};
+
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 const fmt12 = t => { if (!t) return ""; const [h, m] = t.split(":"); const hr = parseInt(h); return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? "PM" : "AM"}`; };
 const fmtDate = d => { if (!d) return ""; return new Date(d + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); };
@@ -158,8 +169,9 @@ const TextArea = ({ label, hint, style: fs, ...props }) => <Field label={label} 
 const Sel = ({ label, hint, children, style: fs, ...props }) => <Field label={label} hint={hint} style={fs}><select style={inputStyle} {...props}>{children}</select></Field>;
 
 const Modal = ({ title, onClose, children, wide }) => (
-  <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={e => e.target === e.currentTarget && onClose()}>
-    <div style={{ background: C.white, borderRadius: 18, padding: 30, width: "100%", maxWidth: wide ? 780 : 580, maxHeight: "88vh", overflowY: "auto", boxShadow: "0 30px 80px rgba(0,0,0,0.3)" }}>
+  <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 2000, display: "flex", alignItems: "flex-end", justifyContent: "center", padding: 0 }} onClick={e => e.target === e.currentTarget && onClose()}>
+    <div style={{ background: C.white, borderRadius: "18px 18px 0 0", padding: "24px 20px 36px", width: "100%", maxWidth: wide ? 780 : 580, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 -8px 60px rgba(0,0,0,0.25)" }}>
+      <div style={{ width: 40, height: 4, background: C.fog, borderRadius: 4, margin: "0 auto 18px" }} />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
         <h2 style={{ margin: 0, color: C.obsidian, fontSize: 20, fontFamily: "Georgia, serif" }}>{title}</h2>
         <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: C.silver, lineHeight: 1 }}>✕</button>
@@ -422,11 +434,11 @@ function Onboarding({ client, onComplete }) {
               <div style={{ background: "#3A6B8C18", borderRadius: 14, padding: 16, border: "1.5px dashed #3A6B8C" }}>
                 <div style={{ fontWeight: 800, fontSize: 13, color: C.sky, marginBottom: 10 }}>ADD A DOG</div>
                 <div style={{ display: "grid", gap: 10 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
                     <Input label="Name" placeholder="Biscuit" value={dogForm.name} onChange={e => setDogForm(f => ({ ...f, name: e.target.value }))} />
                     <Input label="Breed" placeholder="Golden Retriever" value={dogForm.breed} onChange={e => setDogForm(f => ({ ...f, breed: e.target.value }))} />
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
                     <Sel label="Sex" value={dogForm.sex} onChange={e => setDogForm(f => ({ ...f, sex: e.target.value }))}><option>Male</option><option>Female</option></Sel>
                     <Field label="Fixed?"><label style={{ display: "flex", gap: 6, alignItems: "center", height: 42, cursor: "pointer", fontSize: 14 }}><input type="checkbox" checked={dogForm.neutered} onChange={e => setDogForm(f => ({ ...f, neutered: e.target.checked }))} />Yes</label></Field>
                   </div>
@@ -588,7 +600,7 @@ function BookSession({ client, setClient, setClients, discountCodes, giftCards, 
       {/* Step 1: Trainer & Type */}
       {step === 1 && (
         <div style={{ display: "grid", gap: 16 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
             {[["facility", "🏠", "At the Facility", "$90"], ["in-home", "🚗", "In-Home", "$110"]].map(([v, icon, label, price]) => (
               <div key={v} onClick={() => { setSessionType(v); setSelectedDate(""); setSelectedTime(""); }} style={{ padding: 16, borderRadius: 14, border: `2px solid ${sessionType === v ? C.gold : C.fog}`, background: sessionType === v ? C.gold + "14" : C.white, cursor: "pointer", textAlign: "center", transition: "all 0.15s" }}>
                 <div style={{ fontSize: 28, marginBottom: 6 }}>{icon}</div>
@@ -662,7 +674,7 @@ function BookSession({ client, setClient, setClients, discountCodes, giftCards, 
                 {intake.dogs.length > 1 && (
                   <button onClick={() => removeIntakeDog(dog.id)} style={{ position: "absolute", top: 10, right: 12, background: "none", border: "none", color: C.rust, cursor: "pointer", fontWeight: 800, fontSize: 16 }}>✕</button>
                 )}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
                   <Input label="Name *" value={dog.name} onChange={e => updateIntakeDog(dog.id, "name", e.target.value)} />
                   <Input label="Breed" value={dog.breed} onChange={e => updateIntakeDog(dog.id, "breed", e.target.value)} />
                   <Input label="Date of Birth" type="date" value={dog.dob} onChange={e => updateIntakeDog(dog.id, "dob", e.target.value)} />
@@ -719,7 +731,7 @@ function BookSession({ client, setClient, setClients, discountCodes, giftCards, 
               <div style={{ display: "grid", gap: 10 }}>
                 <Input label="Name on Card" value={card.name} onChange={e => setCard(c => ({ ...c, name: e.target.value }))} />
                 <Input label="Card Number" placeholder="4242 4242 4242 4242" value={card.number} onChange={e => setCard(c => ({ ...c, number: e.target.value }))} />
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
                   <Input label="Expiry" placeholder="MM/YY" value={card.exp} onChange={e => setCard(c => ({ ...c, exp: e.target.value }))} />
                   <Input label="CVC" placeholder="123" value={card.cvc} onChange={e => setCard(c => ({ ...c, cvc: e.target.value }))} />
                 </div>
@@ -861,7 +873,7 @@ function BookClass({ client, setClient, setClients, discountCodes, giftCards, cl
           <Input label="Email *" type="email" value={intake.email} onChange={e => setIntake(f => ({ ...f, email: e.target.value }))} />
           <Input label="Home Address" value={intake.address} onChange={e => setIntake(f => ({ ...f, address: e.target.value }))} />
           <TextArea label="What are you hoping your dog will get out of this class?" value={intake.issues} onChange={e => setIntake(f => ({ ...f, issues: e.target.value }))} />
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
             <Input label="Veterinarian Name *" value={intake.vetName} onChange={e => setIntake(f => ({ ...f, vetName: e.target.value }))} />
             <Input label="Vet Phone *" value={intake.vetPhone} onChange={e => setIntake(f => ({ ...f, vetPhone: e.target.value }))} />
           </div>
@@ -875,7 +887,7 @@ function BookClass({ client, setClient, setClients, discountCodes, giftCards, cl
                 {intake.dogs.length > 1 && (
                   <button onClick={() => removeIntakeDog(dog.id)} style={{ position: "absolute", top: 10, right: 12, background: "none", border: "none", color: C.rust, cursor: "pointer", fontWeight: 800, fontSize: 16 }}>✕</button>
                 )}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 10 }}>
                   <Input label="Name *" value={dog.name} onChange={e => updateIntakeDog(dog.id, "name", e.target.value)} />
                   <Input label="Breed" value={dog.breed} onChange={e => updateIntakeDog(dog.id, "breed", e.target.value)} />
                   <Input label="Date of Birth" type="date" value={dog.dob} onChange={e => updateIntakeDog(dog.id, "dob", e.target.value)} />
@@ -941,7 +953,7 @@ function BookClass({ client, setClient, setClients, discountCodes, giftCards, cl
                 <div style={{ display: "grid", gap: 10 }}>
                   <Input label="Name on Card" value={card.name} onChange={e => setCard(c => ({ ...c, name: e.target.value }))} />
                   <Input label="Card Number" placeholder="4242 4242 4242 4242" value={card.number} onChange={e => setCard(c => ({ ...c, number: e.target.value }))} />
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
                     <Input label="Expiry" placeholder="MM/YY" value={card.exp} onChange={e => setCard(c => ({ ...c, exp: e.target.value }))} />
                     <Input label="CVC" placeholder="123" value={card.cvc} onChange={e => setCard(c => ({ ...c, cvc: e.target.value }))} />
                   </div>
@@ -1240,18 +1252,18 @@ function MyAccount({ client, setClient }) {
       {showAddDog && (
         <Modal title={editDog ? "Edit Dog" : "Add a Dog"} onClose={() => { setShowAddDog(false); setEditDog(null); }}>
           <div style={{ display: "grid", gap: 12 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
               <Input label="Name" value={dogForm.name} onChange={e => setDogForm(f => ({ ...f, name: e.target.value }))} />
               <Input label="Breed" value={dogForm.breed} onChange={e => setDogForm(f => ({ ...f, breed: e.target.value }))} />
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
               <Input label="Age" type="number" value={dogForm.age} onChange={e => setDogForm(f => ({ ...f, age: e.target.value }))} />
               <Sel label="Sex" value={dogForm.sex} onChange={e => setDogForm(f => ({ ...f, sex: e.target.value }))}><option>Male</option><option>Female</option></Sel>
               <Field label="Fixed?"><label style={{ display: "flex", gap: 6, alignItems: "center", height: 42, cursor: "pointer", fontSize: 14 }}><input type="checkbox" checked={dogForm.neutered} onChange={e => setDogForm(f => ({ ...f, neutered: e.target.checked }))} />Yes</label></Field>
             </div>
             <Input label="Birthday" type="date" value={dogForm.birthday} onChange={e => setDogForm(f => ({ ...f, birthday: e.target.value }))} />
             <TextArea label="Behavioral Notes" value={dogForm.notes} onChange={e => setDogForm(f => ({ ...f, notes: e.target.value }))} />
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
               <Field label="Dog Photo">
                 <input type="file" accept="image/*" ref={photoRef} onChange={e => { const f = e.target.files[0]; if (f) { const r = new FileReader(); r.onload = x => setDogForm(d => ({ ...d, photo: x.target.result })); r.readAsDataURL(f); } }} style={{ display: "none" }} />
                 <button onClick={() => photoRef.current.click()} style={{ ...inputStyle, cursor: "pointer", textAlign: "left", background: C.white, color: dogForm.photo ? C.sage : C.silver, fontSize: 13 }}>{dogForm.photo ? "✓ Added" : "📷 Upload"}</button>
@@ -1326,7 +1338,7 @@ function ClientHome({ client, classInstances, classTemplates, staffList, setPage
         <h1 style={{ fontFamily: "Georgia, serif", fontSize: 26, color: C.obsidian, margin: 0 }}>Hi, {firstName}! 🐾</h1>
         <p style={{ color: C.silver, margin: "6px 0 0" }}>Welcome to Core Canine.</p>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 24 }}>
         {[
           { label: "Book a Session", sub: "1-on-1 with a trainer", icon: "🎯", page: "book-session", color: C.gold },
           { label: "Enroll in a Class", sub: "Group programs", icon: "🐕", page: "book-class", color: C.sage },
@@ -1462,7 +1474,7 @@ function Dashboard({ currentUser, staff, clients, sessions, classInstances, clas
           </Card>
         ))}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 20 }}>
         <Card>
           <h3 style={{ fontFamily: "Georgia, serif", color: C.obsidian, marginTop: 0, fontSize: 16 }}>Upcoming Sessions</h3>
           {mySessionsUpcoming.slice(0, 5).map(s => {
@@ -2260,7 +2272,7 @@ function Sessions({ currentUser, staff, clients, setClients, sessions, setSessio
               {getAvailTimes().map(t => <option key={t} value={t}>{fmt12(t)}</option>)}
             </Sel>
             <Input label="Custom time override" type="time" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} hint="You can type any time — not limited to schedule slots" />
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
               <Input label="Duration (min)" type="number" value={form.duration} onChange={e => setForm(f => ({ ...f, duration: e.target.value }))} />
               <Input label="Price ($)" type="number" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} hint="Leave blank or 0 for complimentary" />
             </div>
@@ -2724,7 +2736,7 @@ function Classes({ currentUser, staff, clients, setClients, classTemplates, setC
           <div style={{ display: "grid", gap: 14 }}>
             <Input label="Class Name" value={tmplForm.name} onChange={e => setTmplForm(f => ({ ...f, name: e.target.value }))} />
             <TextArea label="Description" value={tmplForm.description} onChange={e => setTmplForm(f => ({ ...f, description: e.target.value }))} />
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
               <Input label="# Weeks" type="number" value={tmplForm.weeks} onChange={e => setTmplForm(f => ({ ...f, weeks: e.target.value }))} />
               <Input label="Max Dogs" type="number" value={tmplForm.maxDogs} onChange={e => setTmplForm(f => ({ ...f, maxDogs: e.target.value }))} />
               <Input label="Price ($)" type="number" value={tmplForm.price} onChange={e => setTmplForm(f => ({ ...f, price: e.target.value }))} />
@@ -2776,7 +2788,7 @@ function Classes({ currentUser, staff, clients, setClients, classTemplates, setC
                 </Sel>
               )}
               <Input label="Start Date" type="date" value={instForm.startDate} onChange={e => setInstForm(f => ({ ...f, startDate: e.target.value, skipDates: [] }))} />
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
                 <Input label="Time" type="time" value={instForm.time} onChange={e => setInstForm(f => ({ ...f, time: e.target.value }))} />
                 <Sel label="Duration" value={instForm.duration} onChange={e => setInstForm(f => ({ ...f, duration: parseInt(e.target.value) }))}>
                   <option value={30}>30 min</option>
@@ -3433,7 +3445,7 @@ function EmailCenter({ currentUser, clients, sessions, classInstances, classTemp
 
       {/* ── SEND TAB ──────────────────────────────────────────────────────────── */}
       {tab === "send" && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, alignItems: "start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 20, alignItems: "start" }}>
 
           {/* Left: compose */}
           <div style={{ display: "grid", gap: 14 }}>
@@ -3747,7 +3759,7 @@ function SettingsPage({ settings, setSettings }) {
         <Card>
           <h3 style={{ fontFamily: "Georgia, serif", marginTop: 0 }}>Session Pricing</h3>
           <p style={{ color: C.silver, fontSize: 13, margin: "0 0 14px" }}>All private sessions are 90 minutes with a 30-minute buffer.</p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 14 }}>
             <Input label="Initial — Facility ($)" type="number" value={settings.priceInitialFacility || ""} placeholder="150" onChange={e => setSettings(s => ({ ...s, priceInitialFacility: e.target.value }))} />
             <Input label="Follow-Up — Facility ($)" type="number" value={settings.priceFollowupFacility || ""} placeholder="120" onChange={e => setSettings(s => ({ ...s, priceFollowupFacility: e.target.value }))} />
             <Input label="Initial — In-Home ($)" type="number" value={settings.priceInitialInHome || ""} placeholder="175" onChange={e => setSettings(s => ({ ...s, priceInitialInHome: e.target.value }))} />
@@ -3801,33 +3813,49 @@ function StaffPortal({ currentUser, onSignOut, staff, setStaff, clients, setClie
   const nav = currentUser.role === "admin" ? NAV_ADMIN : NAV_TRAINER;
   const pageProps = { currentUser, staff, setStaff, clients, setClients, sessions, setSessions, classTemplates, setClassTemplates, classInstances, setClassInstances, schedule, setSchedule, oneOffSlots, setOneOffSlots, blockedDates, setBlockedDates, homeworkCards, setHomeworkCards, discountCodes, setDiscountCodes, giftCards, setGiftCards, messages, setMessages, dogNotes, setDogNotes, refunds, emailTemplates, setEmailTemplates, settings, setSettings, promotionLog, setPromotionLog };
 
+  const isMobile = useIsMobile();
+
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: C.cream, fontFamily: "Georgia, serif" }}>
-      {/* Sidebar */}
-      <nav style={{ width: navOpen ? 230 : 62, transition: "width 0.2s", background: C.obsidian, display: "flex", flexDirection: "column", flexShrink: 0, position: "sticky", top: 0, height: "100vh", overflowX: "hidden" }}>
-        <div style={{ padding: navOpen ? "22px 18px 16px" : "22px 14px 16px", borderBottom: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", gap: 10, minHeight: 70 }}>
-          <span style={{ fontSize: 22, flexShrink: 0 }}>🐾</span>
-          {navOpen && <div>
-            <div style={{ fontWeight: 800, fontSize: 14, color: C.cream, letterSpacing: 0.5 }}>Core Canine</div>
-            <div style={{ fontSize: 11, color: C.silver }}>{currentUser.role === "admin" ? "Admin Portal" : "Trainer Portal"}</div>
-          </div>}
-          <button onClick={() => setNavOpen(o => !o)} style={{ marginLeft: "auto", background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 16, flexShrink: 0 }}>☰</button>
+      {/* Sidebar — desktop only */}
+      {!isMobile && (
+        <nav style={{ width: navOpen ? 230 : 62, transition: "width 0.2s", background: C.obsidian, display: "flex", flexDirection: "column", flexShrink: 0, position: "sticky", top: 0, height: "100vh", overflowX: "hidden" }}>
+          <div style={{ padding: navOpen ? "22px 18px 16px" : "22px 14px 16px", borderBottom: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", gap: 10, minHeight: 70 }}>
+            <span style={{ fontSize: 22, flexShrink: 0 }}>🐾</span>
+            {navOpen && <div>
+              <div style={{ fontWeight: 800, fontSize: 14, color: C.cream, letterSpacing: 0.5 }}>Core Canine</div>
+              <div style={{ fontSize: 11, color: C.silver }}>{currentUser.role === "admin" ? "Admin Portal" : "Trainer Portal"}</div>
+            </div>}
+            <button onClick={() => setNavOpen(o => !o)} style={{ marginLeft: "auto", background: "none", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 16, flexShrink: 0 }}>☰</button>
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "8px 0" }}>
+            {nav.map(n => (
+              <button key={n.id} onClick={() => setPage(n.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: navOpen ? "11px 18px" : "11px 0", justifyContent: navOpen ? "flex-start" : "center", width: "100%", background: page === n.id ? "rgba(201,147,58,0.15)" : "transparent", border: "none", color: page === n.id ? C.gold : "rgba(255,255,255,0.6)", cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: page === n.id ? 700 : 400, textAlign: "left", borderLeft: page === n.id ? `3px solid ${C.gold}` : "3px solid transparent", transition: "all 0.13s", whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: 16, flexShrink: 0 }}>{n.icon}</span>
+                {navOpen && n.label}
+              </button>
+            ))}
+          </div>
+          <div style={{ padding: navOpen ? "12px 18px" : "12px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+            {navOpen && <div style={{ fontSize: 12, color: C.silver, marginBottom: 8 }}>Signed in as <b style={{ color: C.gold }}>{currentUser.name}</b></div>}
+            <button onClick={onSignOut} style={{ background: "rgba(255,255,255,0.06)", border: "none", color: "rgba(255,255,255,0.5)", borderRadius: 8, padding: navOpen ? "7px 12px" : "7px", cursor: "pointer", fontSize: 12, width: navOpen ? "auto" : 34, fontFamily: "inherit" }}>{navOpen ? "Sign Out" : "↩"}</button>
+          </div>
+        </nav>
+      )}
+
+      {/* Mobile top bar */}
+      {isMobile && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, background: C.obsidian, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 200 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 20 }}>🐾</span>
+            <div style={{ fontWeight: 800, fontSize: 14, color: C.cream }}>Core Canine</div>
+          </div>
+          <button onClick={onSignOut} style={{ background: "rgba(255,255,255,0.08)", border: "none", color: C.silver, borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>Sign Out</button>
         </div>
-        <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "8px 0" }}>
-          {nav.map(n => (
-            <button key={n.id} onClick={() => setPage(n.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: navOpen ? "11px 18px" : "11px 0", justifyContent: navOpen ? "flex-start" : "center", width: "100%", background: page === n.id ? "rgba(201,147,58,0.15)" : "transparent", border: "none", color: page === n.id ? C.gold : "rgba(255,255,255,0.6)", cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: page === n.id ? 700 : 400, textAlign: "left", borderLeft: page === n.id ? `3px solid ${C.gold}` : "3px solid transparent", transition: "all 0.13s", whiteSpace: "nowrap" }}>
-              <span style={{ fontSize: 16, flexShrink: 0 }}>{n.icon}</span>
-              {navOpen && n.label}
-            </button>
-          ))}
-        </div>
-        <div style={{ padding: navOpen ? "12px 18px" : "12px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-          {navOpen && <div style={{ fontSize: 12, color: C.silver, marginBottom: 8 }}>Signed in as <b style={{ color: C.gold }}>{currentUser.name}</b></div>}
-          <button onClick={onSignOut} style={{ background: "rgba(255,255,255,0.06)", border: "none", color: "rgba(255,255,255,0.5)", borderRadius: 8, padding: navOpen ? "7px 12px" : "7px", cursor: "pointer", fontSize: 12, width: navOpen ? "auto" : 34, fontFamily: "inherit" }}>{navOpen ? "Sign Out" : "↩"}</button>
-        </div>
-      </nav>
+      )}
+
       {/* Main */}
-      <main style={{ flex: 1, padding: "32px 30px", overflowX: "hidden", maxWidth: "calc(100vw - 62px)" }}>
+      <main style={{ flex: 1, padding: isMobile ? "72px 16px 80px" : "32px 30px", overflowX: "hidden", maxWidth: isMobile ? "100vw" : `calc(100vw - ${navOpen ? 230 : 62}px)` }}>
         {page === "dashboard" && <Dashboard {...pageProps} />}
         {page === "calendar" && <CalendarView {...pageProps} />}
         {page === "schedule" && <ScheduleManager {...pageProps} />}
@@ -3842,6 +3870,22 @@ function StaffPortal({ currentUser, onSignOut, staff, setStaff, clients, setClie
         {page === "reports" && currentUser.role === "admin" && <Reports {...pageProps} />}
         {page === "settings" && currentUser.role === "admin" && <SettingsPage {...pageProps} />}
       </main>
+
+      {/* Mobile bottom nav */}
+      {isMobile && (
+        <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: C.obsidian, borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", justifyContent: "space-around", padding: "6px 0 8px", zIndex: 200 }}>
+          {nav.slice(0, 5).map(n => (
+            <button key={n.id} onClick={() => setPage(n.id)} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "4px 6px", color: page === n.id ? C.gold : "rgba(255,255,255,0.4)", fontFamily: "inherit", minWidth: 44 }}>
+              <span style={{ fontSize: 18 }}>{n.icon}</span>
+              <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.3 }}>{n.label.split(" ")[0]}</span>
+            </button>
+          ))}
+          <button onClick={() => setPage(nav[5]?.id || "settings")} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "4px 6px", color: nav.slice(5).some(n => n.id === page) ? C.gold : "rgba(255,255,255,0.4)", fontFamily: "inherit", minWidth: 44 }}>
+            <span style={{ fontSize: 18 }}>⋯</span>
+            <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.3 }}>More</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
