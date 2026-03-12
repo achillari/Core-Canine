@@ -503,7 +503,7 @@ function Onboarding({ client, onComplete }) {
 }
 
 // ─── CLIENT PORTAL SCREENS ────────────────────────────────────────────────────
-function BookSession({ client, setClient, setClients, discountCodes, giftCards, staffList, schedule, sessions, onBack, onBooked }) {
+function BookSession({ client, setClient, setClients, discountCodes, giftCards, staffList, schedule, sessions, blockedDates, onBack, onBooked }) {
   const isReturning = !!(client?.name && client?.email && client?.dogs?.length > 0);
   const [step, setStep] = useState(1);
   const [trainer, setTrainer] = useState(null);
@@ -545,7 +545,17 @@ function BookSession({ client, setClient, setClients, discountCodes, giftCards, 
     const bookedTimes = (sessions || [])
       .filter(s => s.trainerId === trainer.id && s.date === dateStr && s.status !== "cancelled")
       .map(s => s.time);
-    return allSlots.filter(t => !bookedTimes.includes(t));
+    const timeBlocks = (blockedDates || []).filter(b =>
+      b.trainerId === trainer.id && b.blockType === "time" && b.startDate === dateStr
+    );
+    return allSlots.filter(slot => {
+      if (bookedTimes.includes(slot)) return false;
+      // filter out slot if it falls within any time block
+      for (const b of timeBlocks) {
+        if (slot >= b.startTime && slot < b.endTime) return false;
+      }
+      return true;
+    });
   };
 
   const getDates = () => {
@@ -1379,7 +1389,7 @@ function ClientHome({ client, classInstances, classTemplates, staffList, setPage
 }
 
 // ─── CLIENT PORTAL WRAPPER ────────────────────────────────────────────────────
-function ClientPortal({ client, setClient, onSignOut, staff, sessions, classTemplates, classInstances, setClassInstances, discountCodes, giftCards, messages, setMessages, schedule, setPromotionLog, clients, setClients }) {
+function ClientPortal({ client, setClient, onSignOut, staff, sessions, classTemplates, classInstances, setClassInstances, discountCodes, giftCards, messages, setMessages, schedule, setPromotionLog, clients, setClients, blockedDates }) {
   const [page, setPage] = useState("home");
   const [bookings, setBookings] = useState([
     { id: 1, bookingType: "session", trainerId: 1, trainerName: "Core Canine Owner", date: "2026-04-02", time: "10:00", sessionType: "facility", price: 90, status: "confirmed" },
@@ -1399,7 +1409,7 @@ function ClientPortal({ client, setClient, onSignOut, staff, sessions, classTemp
     setPage("bookings");
   };
 
-  const sharedProps = { client, setClient, setClients, discountCodes, giftCards, staffList: staff, schedule, sessions, classTemplates, classInstances };
+  const sharedProps = { client, setClient, setClients, discountCodes, giftCards, staffList: staff, schedule, sessions, classTemplates, classInstances, blockedDates };
 
   return (
     <div style={{ minHeight: "100vh", background: C.cream, fontFamily: "Georgia, serif", paddingBottom: 80 }}>
@@ -1628,7 +1638,7 @@ function CalendarView({ currentUser, staff, clients, sessions, classInstances, c
   const [view, setView] = useState("week");
   const [anchor, setAnchor] = useState(today); // "YYYY-MM-DD" reference date
   const [showBlockModal, setShowBlockModal] = useState(false);
-  const [blockForm, setBlockForm] = useState({ startDate: "", endDate: "", reason: "" });
+  const [blockForm, setBlockForm] = useState({ startDate: "", endDate: "", reason: "", blockType: "allday", startTime: "", endTime: "" });
   const [showIcalModal, setShowIcalModal] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
   const [adminCancelModal, setAdminCancelModal] = useState(null); // session object
@@ -1715,7 +1725,11 @@ function CalendarView({ currentUser, staff, clients, sessions, classInstances, c
       .forEach(b => {
         const trainer = staff.find(t => t.id === b.trainerId);
         events.push({
-          key: `b-${b.id}-${ds}`, time: "00:00", label: isAdmin ? `${trainer?.firstName || trainer?.name}: Time Off` : "Time Off",
+          key: `b-${b.id}-${ds}`,
+          time: b.blockType === "time" ? b.startTime : "00:00",
+          label: b.blockType === "time"
+            ? (isAdmin ? `${trainer?.firstName || trainer?.name}: ${fmt12(b.startTime)}–${fmt12(b.endTime)}` : `Blocked ${fmt12(b.startTime)}–${fmt12(b.endTime)}`)
+            : (isAdmin ? `${trainer?.firstName || trainer?.name}: Time Off` : "Time Off"),
           sub: b.reason || "", color: C.steel, kind: "block"
         });
       });
@@ -1800,9 +1814,20 @@ function CalendarView({ currentUser, staff, clients, sessions, classInstances, c
   // ── block form save ────────────────────────────────────────────────────────
   const saveBlock = () => {
     if (!blockForm.startDate) return;
-    const end = blockForm.endDate || blockForm.startDate;
-    setBlockedDates(bs => [...bs, { id: Date.now(), trainerId: currentUser.id, startDate: blockForm.startDate, endDate: end, reason: blockForm.reason }]);
-    setBlockForm({ startDate: "", endDate: "", reason: "" });
+    if (blockForm.blockType === "time" && (!blockForm.startTime || !blockForm.endTime)) return;
+    const end = blockForm.blockType === "time" ? blockForm.startDate : (blockForm.endDate || blockForm.startDate);
+    const trainerId = parseInt(blockForm.trainerId) || currentUser.id;
+    setBlockedDates(bs => [...bs, {
+      id: Date.now(),
+      trainerId,
+      startDate: blockForm.startDate,
+      endDate: end,
+      reason: blockForm.reason,
+      blockType: blockForm.blockType,
+      startTime: blockForm.blockType === "time" ? blockForm.startTime : null,
+      endTime: blockForm.blockType === "time" ? blockForm.endTime : null,
+    }]);
+    setBlockForm({ startDate: "", endDate: "", reason: "", blockType: "allday", startTime: "", endTime: "" });
     setShowBlockModal(false);
   };
 
@@ -1959,7 +1984,9 @@ function CalendarView({ currentUser, staff, clients, sessions, classInstances, c
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 13, color: C.obsidian }}>
                       {isAdmin && <span style={{ color: C.gold }}>{trainer?.firstName || trainer?.name}: </span>}
-                      {b.startDate === b.endDate ? fmtDate(b.startDate) : `${fmtDate(b.startDate)} – ${fmtDate(b.endDate)}`}
+                      {b.blockType === "time"
+                        ? `${fmtDate(b.startDate)} · ${fmt12(b.startTime)} – ${fmt12(b.endTime)}`
+                        : b.startDate === b.endDate ? fmtDate(b.startDate) : `${fmtDate(b.startDate)} – ${fmtDate(b.endDate)}`}
                     </div>
                     {b.reason && <div style={{ fontSize: 12, color: C.steel, fontStyle: "italic" }}>{b.reason}</div>}
                   </div>
@@ -1977,16 +2004,38 @@ function CalendarView({ currentUser, staff, clients, sessions, classInstances, c
       {showBlockModal && (
         <Modal title="Block Time Off" onClose={() => setShowBlockModal(false)}>
           <div style={{ display: "grid", gap: 14 }}>
-            <p style={{ color: C.steel, fontSize: 13, margin: 0 }}>Clients won't see available slots during blocked dates — no "out of office" message is shown to them.</p>
+            <p style={{ color: C.steel, fontSize: 13, margin: 0 }}>Blocked times won't be available for clients to book — no message is shown to them.</p>
             {isAdmin && (
               <Sel label="Block for" value={blockForm.trainerId || ""} onChange={e => setBlockForm(f => ({ ...f, trainerId: e.target.value || currentUser.id }))}>
                 <option value="">Myself ({currentUser.name})</option>
                 {staff.filter(s => s.active && s.id !== currentUser.id).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </Sel>
             )}
-            <Input label="Start Date" type="date" value={blockForm.startDate} onChange={e => setBlockForm(f => ({ ...f, startDate: e.target.value }))} />
-            <Input label="End Date" hint="Same as start date for a single day" type="date" value={blockForm.endDate} onChange={e => setBlockForm(f => ({ ...f, endDate: e.target.value }))} />
-            <Input label="Internal note (optional — not shown to clients)" value={blockForm.reason} placeholder="Vacation, conference, sick day…" onChange={e => setBlockForm(f => ({ ...f, reason: e.target.value }))} />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, background: C.fog, borderRadius: 10, padding: 3 }}>
+              {[["allday", "🗓 Full Day(s)"], ["time", "🕐 Specific Time"]].map(([v, label]) => (
+                <button key={v} onClick={() => setBlockForm(f => ({ ...f, blockType: v }))} style={{ padding: "8px 12px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: blockForm.blockType === v ? C.obsidian : "transparent", color: blockForm.blockType === v ? C.cream : C.silver, fontFamily: "inherit", transition: "all 0.15s" }}>{label}</button>
+              ))}
+            </div>
+            {blockForm.blockType === "allday" ? (
+              <>
+                <Input label="Start Date" type="date" value={blockForm.startDate} onChange={e => setBlockForm(f => ({ ...f, startDate: e.target.value }))} />
+                <Input label="End Date" hint="Same as start for a single day" type="date" value={blockForm.endDate} onChange={e => setBlockForm(f => ({ ...f, endDate: e.target.value }))} />
+              </>
+            ) : (
+              <>
+                <Input label="Date" type="date" value={blockForm.startDate} onChange={e => setBlockForm(f => ({ ...f, startDate: e.target.value }))} />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <Input label="Start Time" type="time" value={blockForm.startTime} onChange={e => setBlockForm(f => ({ ...f, startTime: e.target.value }))} />
+                  <Input label="End Time" type="time" value={blockForm.endTime} onChange={e => setBlockForm(f => ({ ...f, endTime: e.target.value }))} />
+                </div>
+                {blockForm.startTime && blockForm.endTime && (
+                  <div style={{ background: C.rust + "12", border: `1px solid ${C.rust}`, borderRadius: 8, padding: "8px 12px", fontSize: 13, color: C.rust, fontWeight: 600 }}>
+                    🚫 {fmt12(blockForm.startTime)} – {fmt12(blockForm.endTime)} will be unavailable for booking
+                  </div>
+                )}
+              </>
+            )}
+            <Input label="Internal note (optional)" value={blockForm.reason} placeholder="Errand, appointment, meeting…" onChange={e => setBlockForm(f => ({ ...f, reason: e.target.value }))} />
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <Btn variant="ghost" onClick={() => setShowBlockModal(false)}>Cancel</Btn>
               <Btn onClick={saveBlock}>Save Block</Btn>
@@ -3986,6 +4035,7 @@ export default function App() {
         setClassInstances={setClassInstances}
         clients={clients}
         setClients={setClients}
+        blockedDates={blockedDates}
         discountCodes={discountCodes}
         giftCards={giftCards}
         messages={messages}
