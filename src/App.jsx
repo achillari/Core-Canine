@@ -1852,7 +1852,8 @@ function CalendarView({ currentUser, staff, clients, sessions, classInstances, c
       {view === "week" && (() => {
         const days = weekDays();
         return (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6 }}>
+          <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(90px, 1fr))", gap: 6, minWidth: 560 }}>
             {days.map(ds => {
               const events = getEventsForDate(ds);
               return (
@@ -1865,6 +1866,7 @@ function CalendarView({ currentUser, staff, clients, sessions, classInstances, c
               );
             })}
           </div>
+          </div>
         );
       })()}
 
@@ -1874,22 +1876,24 @@ function CalendarView({ currentUser, staff, clients, sessions, classInstances, c
         const DAY_HEADERS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
         return (
           <div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, marginBottom: 4 }}>
+            <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(44px, 1fr))", gap: 2, marginBottom: 4, minWidth: 308 }}>
               {DAY_HEADERS.map(d => <div key={d} style={{ textAlign: "center", fontSize: 11, fontWeight: 800, color: C.silver, textTransform: "uppercase", padding: "6px 0" }}>{d}</div>)}
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(44px, 1fr))", gap: 2, minWidth: 308, gridAutoRows: "72px" }}>
               {Array.from({ length: blanks }).map((_, i) => <div key={`b${i}`} />)}
               {Array.from({ length: total }, (_, i) => {
                 const ds = addDays(start, i);
                 const events = getEventsForDate(ds);
                 return (
-                  <div key={ds} onClick={() => { setAnchor(ds); setView("day"); }} style={{ background: isToday(ds) ? C.gold + "12" : C.white, border: `1.5px solid ${isToday(ds) ? C.gold : C.fog}`, borderRadius: 8, padding: "6px 5px", minHeight: 72, cursor: "pointer" }}>
+                  <div key={ds} onClick={() => { setAnchor(ds); setView("day"); }} style={{ background: isToday(ds) ? C.gold + "12" : C.white, border: `1.5px solid ${isToday(ds) ? C.gold : C.fog}`, borderRadius: 8, padding: "6px 5px", overflow: "hidden", cursor: "pointer" }}>
                     <div style={{ fontSize: 13, fontWeight: 800, color: isToday(ds) ? C.gold : C.obsidian, marginBottom: 3 }}>{dateNum(ds)}</div>
                     {events.slice(0, 2).map(ev => <EventPill key={ev.key} ev={ev} compact />)}
                     {events.length > 2 && <div style={{ fontSize: 9, color: C.silver, fontWeight: 700 }}>+{events.length - 2}</div>}
                   </div>
                 );
               })}
+            </div>
             </div>
           </div>
         );
@@ -3813,6 +3817,7 @@ function StaffPortal({ currentUser, onSignOut, staff, setStaff, clients, setClie
   const nav = currentUser.role === "admin" ? NAV_ADMIN : NAV_TRAINER;
   const pageProps = { currentUser, staff, setStaff, clients, setClients, sessions, setSessions, classTemplates, setClassTemplates, classInstances, setClassInstances, schedule, setSchedule, oneOffSlots, setOneOffSlots, blockedDates, setBlockedDates, homeworkCards, setHomeworkCards, discountCodes, setDiscountCodes, giftCards, setGiftCards, messages, setMessages, dogNotes, setDogNotes, refunds, emailTemplates, setEmailTemplates, settings, setSettings, promotionLog, setPromotionLog };
 
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const isMobile = useIsMobile();
 
   return (
@@ -3880,10 +3885,23 @@ function StaffPortal({ currentUser, onSignOut, staff, setStaff, clients, setClie
               <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.3 }}>{n.label.split(" ")[0]}</span>
             </button>
           ))}
-          <button onClick={() => setPage(nav[5]?.id || "settings")} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "4px 6px", color: nav.slice(5).some(n => n.id === page) ? C.gold : "rgba(255,255,255,0.4)", fontFamily: "inherit", minWidth: 44 }}>
+          <button onClick={() => setShowMoreMenu(m => !m)} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "4px 6px", color: nav.slice(5).some(n => n.id === page) ? C.gold : "rgba(255,255,255,0.4)", fontFamily: "inherit", minWidth: 44 }}>
             <span style={{ fontSize: 18 }}>⋯</span>
             <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.3 }}>More</span>
           </button>
+          {showMoreMenu && (
+            <div style={{ position: "fixed", bottom: 64, right: 0, left: 0, background: C.obsidian, borderTop: "1px solid rgba(255,255,255,0.1)", zIndex: 300, padding: "8px 0" }}>
+              {nav.slice(5).map(n => (
+                <button key={n.id} onClick={() => { setPage(n.id); setShowMoreMenu(false); }} style={{ display: "flex", alignItems: "center", gap: 14, width: "100%", padding: "12px 24px", background: page === n.id ? "rgba(201,147,58,0.15)" : "transparent", border: "none", color: page === n.id ? C.gold : "rgba(255,255,255,0.7)", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: page === n.id ? 700 : 400, textAlign: "left" }}>
+                  <span style={{ fontSize: 18 }}>{n.icon}</span>
+                  {n.label}
+                </button>
+              ))}
+              <button onClick={() => setShowMoreMenu(false)} style={{ display: "flex", alignItems: "center", gap: 14, width: "100%", padding: "12px 24px", background: "transparent", border: "none", color: "rgba(255,255,255,0.3)", cursor: "pointer", fontFamily: "inherit", fontSize: 13, textAlign: "left" }}>
+                ✕ Close
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
