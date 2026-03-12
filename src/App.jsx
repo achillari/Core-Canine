@@ -2107,8 +2107,8 @@ function Sessions({ currentUser, staff, clients, setClients, sessions, setSessio
   const [reminderSent, setReminderSent] = useState([]);
   const [reviewSent, setReviewSent] = useState([]);
   const [selectedClient, setSelectedClient] = useState(null);
-
-  const mine = sessions.filter(s => currentUser.role === "admin" || s.trainerId === currentUser.id);
+  const [adminCancelModal, setAdminCancelModal] = useState(null);
+  const [adminCancelChoice, setAdminCancelChoice] = useState("credit");
   const filtered = mine.filter(s => {
     if (filter === "upcoming") return s.date >= today && s.status !== "cancelled";
     if (filter === "past") return s.date < today || s.status === "completed";
