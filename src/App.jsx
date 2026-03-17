@@ -368,7 +368,7 @@ function UnifiedLogin({ onStaffLogin, onClientLogin, staff, clients, settings })
 // ─── CLIENT ONBOARDING ────────────────────────────────────────────────────────
 function Onboarding({ client, onComplete }) {
   const [step, setStep] = useState(1);
-  const [profile, setProfile] = useState({ name: "", email: "", phone: client.phone || "" });
+  const [profile, setProfile] = useState({ name: "", email: "", phone: client.phone || "", address: "", vetName: "", vetPhone: "", issues: "" });
   const [dogs, setDogs] = useState([]);
   const [dogForm, setDogForm] = useState({ name: "", breed: "", age: "", ageUnit: "years", sex: "Male", neutered: false, birthday: "", notes: "", photo: null, vaccineDoc: null });
   const [waiverChecked, setWaiverChecked] = useState(false);
@@ -415,10 +415,19 @@ function Onboarding({ client, onComplete }) {
           {step === 1 && (
             <div style={{ display: "grid", gap: 14 }}>
               <h3 style={{ fontFamily: "Georgia, serif", margin: "0 0 4px", color: C.obsidian }}>Your Contact Info</h3>
-              <Input label="Full Name" placeholder="Jane Smith" value={profile.name} onChange={e => setProfile(p => ({ ...p, name: e.target.value }))} />
-              <Input label="Email" type="email" placeholder="you@email.com" value={profile.email} onChange={e => setProfile(p => ({ ...p, email: e.target.value }))} />
-              <Input label="Phone" value={profile.phone} onChange={e => setProfile(p => ({ ...p, phone: e.target.value }))} />
-              <Btn full onClick={() => { if (profile.name && profile.email) setStep(2); }}>Continue →</Btn>
+              <Input label="Full Name *" placeholder="Jane Smith" value={profile.name} onChange={e => setProfile(p => ({ ...p, name: e.target.value }))} />
+              <Input label="Email *" type="email" placeholder="you@email.com" value={profile.email} onChange={e => setProfile(p => ({ ...p, email: e.target.value }))} />
+              <Input label="Phone *" value={profile.phone} onChange={e => setProfile(p => ({ ...p, phone: e.target.value }))} />
+              <Input label="Home Address" placeholder="123 Main St, City, State" value={profile.address} onChange={e => setProfile(p => ({ ...p, address: e.target.value }))} />
+              <div style={{ borderTop: `1px solid ${C.fog}`, paddingTop: 14, marginTop: 4 }}>
+                <div style={{ fontWeight: 800, fontSize: 12, color: C.silver, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 10 }}>Veterinarian Info</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
+                  <Input label="Vet Name" placeholder="Animal Hospital name" value={profile.vetName} onChange={e => setProfile(p => ({ ...p, vetName: e.target.value }))} />
+                  <Input label="Vet Phone" placeholder="(555) 000-0000" value={profile.vetPhone} onChange={e => setProfile(p => ({ ...p, vetPhone: e.target.value }))} />
+                </div>
+              </div>
+              <TextArea label="What would you like to work on? (optional)" placeholder="Leash pulling, jumping, reactivity, basic manners…" value={profile.issues} onChange={e => setProfile(p => ({ ...p, issues: e.target.value }))} />
+              <Btn full onClick={() => { if (profile.name && profile.email && profile.phone) setStep(2); else alert("Please fill in your name, email, and phone number."); }}>Continue →</Btn>
             </div>
           )}
           {step === 2 && (
@@ -464,6 +473,7 @@ function Onboarding({ client, onComplete }) {
                     <input type="file" accept="image/*" ref={photoRef} onChange={e => { const f = e.target.files[0]; if (f) { const r = new FileReader(); r.onload = x => setDogForm(d => ({ ...d, photo: x.target.result })); r.readAsDataURL(f); } }} style={{ display: "none" }} />
                     <button onClick={() => photoRef.current.click()} style={{ ...inputStyle, cursor: "pointer", textAlign: "left", background: C.white, color: dogForm.photo ? C.sage : C.silver, fontSize: 13 }}>{dogForm.photo ? "✓ Photo added" : "📷 Upload photo"}</button>
                   </Field>
+
                   <Btn variant="sky" onClick={addDog}>{dogs.length === 0 ? (dogForm.name ? `✓ Save ${dogForm.name}` : "✓ Save Dog") : (dogForm.name ? `+ Add ${dogForm.name}` : `+ Add ${dogs.length === 1 ? "Second" : dogs.length === 2 ? "Third" : "Another"} Dog`)}</Btn>
                 </div>
               </div>
@@ -504,7 +514,7 @@ function Onboarding({ client, onComplete }) {
 
 // ─── CLIENT PORTAL SCREENS ────────────────────────────────────────────────────
 function BookSession({ client, setClient, setClients, discountCodes, giftCards, staffList, schedule, sessions, blockedDates, onBack, onBooked }) {
-  const isReturning = !!(client?.name && client?.email && client?.dogs?.length > 0);
+  const isReturning = !!(client?.name && client?.email && client?.dogs?.length > 0 && client?.address);
   const [step, setStep] = useState(1);
   const [trainer, setTrainer] = useState(null);
   const [sessionType, setSessionType] = useState("facility");
@@ -783,7 +793,7 @@ function BookSession({ client, setClient, setClients, discountCodes, giftCards, 
 }
 
 function BookClass({ client, setClient, setClients, discountCodes, giftCards, classTemplates, classInstances, staffList, onBack, onBooked }) {
-  const isReturning = !!(client?.name && client?.email && client?.dogs?.length > 0);
+  const isReturning = !!(client?.name && client?.email && client?.dogs?.length > 0 && client?.vetName);
   const [selected, setSelected] = useState(null);
   const [step, setStep] = useState(1);
   // Intake (new clients only) — same as session PLUS vet info + vaccine upload
