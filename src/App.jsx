@@ -419,14 +419,6 @@ function Onboarding({ client, onComplete }) {
               <Input label="Email *" type="email" placeholder="you@email.com" value={profile.email} onChange={e => setProfile(p => ({ ...p, email: e.target.value }))} />
               <Input label="Phone *" value={profile.phone} onChange={e => setProfile(p => ({ ...p, phone: e.target.value }))} />
               <Input label="Home Address" placeholder="123 Main St, City, State" value={profile.address} onChange={e => setProfile(p => ({ ...p, address: e.target.value }))} />
-              <div style={{ borderTop: `1px solid ${C.fog}`, paddingTop: 14, marginTop: 4 }}>
-                <div style={{ fontWeight: 800, fontSize: 12, color: C.silver, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 10 }}>Veterinarian Info</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
-                  <Input label="Vet Name" placeholder="Animal Hospital name" value={profile.vetName} onChange={e => setProfile(p => ({ ...p, vetName: e.target.value }))} />
-                  <Input label="Vet Phone" placeholder="(555) 000-0000" value={profile.vetPhone} onChange={e => setProfile(p => ({ ...p, vetPhone: e.target.value }))} />
-                </div>
-              </div>
-              <TextArea label="What would you like to work on? (optional)" placeholder="Leash pulling, jumping, reactivity, basic manners…" value={profile.issues} onChange={e => setProfile(p => ({ ...p, issues: e.target.value }))} />
               <Btn full onClick={() => { if (profile.name && profile.email && profile.phone) setStep(2); else alert("Please fill in your name, email, and phone number."); }}>Continue →</Btn>
             </div>
           )}
