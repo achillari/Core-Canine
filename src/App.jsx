@@ -757,6 +757,21 @@ function BookSession({ client, setClient, setClients, discountCodes, giftCards, 
                 if (setClient) setClient(c => ({ ...c, accountCredit: Math.max(0, (c.accountCredit || 0) - used) }));
                 if (setClients) setClients(cs => cs.map(c => c.id === client.id ? { ...c, accountCredit: Math.max(0, (c.accountCredit || 0) - used) } : c));
               }
+              if (!isReturning && intake.name) {
+                const updatedClient = {
+                  ...(client || {}),
+                  name: intake.name,
+                  email: intake.email,
+                  address: intake.address || client?.address || "",
+                  issues: intake.issues || "",
+                  dogs: intake.dogs.map(d => ({ ...d, age: d.dob ? Math.floor((new Date() - new Date(d.dob)) / (365.25 * 24 * 3600 * 1000)) : (client?.dogs?.find(x => x.id === d.id)?.age || 0), birthday: d.dob || "", breed: d.breed || "", sex: d.sex || "Unknown", neutered: false, notes: "", photo: null, vaccineDoc: null })),
+                  joinDate: today,
+                  waiverSigned: client?.waiverSigned || false,
+                  accountCredit: client?.accountCredit || 0,
+                };
+                if (setClient) setClient(updatedClient);
+                if (setClients && client?.id) setClients(cs => cs.map(c => c.id === client.id ? { ...c, ...updatedClient } : c));
+              }
               setBooked(true);
               onBooked && onBooked({ type: "session", trainer, date: selectedDate, time: selectedTime, sessionType, price: calcTotal() });
             }}>Confirm & Pay ${calcTotal().toFixed(2)}</Btn>
@@ -978,6 +993,22 @@ function BookClass({ client, setClient, setClients, discountCodes, giftCards, cl
                 if (used > 0) {
                   if (setClient) setClient(c => ({ ...c, accountCredit: Math.max(0, (c.accountCredit || 0) - used) }));
                   if (setClients) setClients(cs => cs.map(c => c.id === client.id ? { ...c, accountCredit: Math.max(0, (c.accountCredit || 0) - used) } : c));
+                }
+                if (!isReturning && intake.name) {
+                  const updatedClient = {
+                    ...(client || {}),
+                    name: intake.name,
+                    email: intake.email,
+                    address: intake.address || client?.address || "",
+                    vetName: intake.vetName || "",
+                    vetPhone: intake.vetPhone || "",
+                    dogs: intake.dogs.map(d => ({ ...d, age: d.dob ? Math.floor((new Date() - new Date(d.dob)) / (365.25 * 24 * 3600 * 1000)) : (client?.dogs?.find(x => x.id === d.id)?.age || 0), birthday: d.dob || "", breed: d.breed || "", sex: d.sex || "Unknown", neutered: false, notes: "", photo: null, vaccineDoc: d.vaccineDoc || null })),
+                    joinDate: today,
+                    waiverSigned: client?.waiverSigned || false,
+                    accountCredit: client?.accountCredit || 0,
+                  };
+                  if (setClient) setClient(updatedClient);
+                  if (setClients && client?.id) setClients(cs => cs.map(c => c.id === client.id ? { ...c, ...updatedClient } : c));
                 }
                 setBooked(true);
                 onBooked && onBooked({ type: "class", instance: selected });
@@ -1588,9 +1619,22 @@ function ClientDetailModal({ client, sessions, dogNotes, setDogNotes, currentUse
               </div>
             </div>
           )}
-          {[["Name", client.name], ["Phone", client.phone], ["Email", client.email], ["Joined", fmtDate(client.joinDate)], ["Waiver", client.waiverSigned ? "Signed" : "Not signed"]].map(([l, v]) => (
+          {[["Name", client.name], ["Phone", client.phone], ["Email", client.email], ["Address", client.address], ["Joined", fmtDate(client.joinDate)], ["Waiver", client.waiverSigned ? "Signed" : "Not signed"]].filter(([,v]) => v).map(([l, v]) => (
             <div key={l}><b style={{ color: C.obsidian }}>{l}:</b> <span style={{ color: C.steel }}>{v}</span></div>
           ))}
+          {(client.vetName || client.vetPhone) && (
+            <div style={{ background: C.cream, borderRadius: 8, padding: "8px 12px", marginTop: 4 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: C.silver, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Vet Info</div>
+              {client.vetName && <div style={{ fontSize: 13, color: C.steel }}>{client.vetName}</div>}
+              {client.vetPhone && <div style={{ fontSize: 13, color: C.steel }}>{client.vetPhone}</div>}
+            </div>
+          )}
+          {client.issues && (
+            <div style={{ background: C.cream, borderRadius: 8, padding: "8px 12px", marginTop: 4 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: C.silver, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Training Goals</div>
+              <div style={{ fontSize: 13, color: C.steel, fontStyle: "italic" }}>{client.issues}</div>
+            </div>
+          )}
         </div>
       )}
       {activeTab === "dogs" && (
@@ -2937,9 +2981,22 @@ function Clients({ currentUser, clients, setClients, sessions, dogNotes, setDogN
                     </div>
                   </div>
                 )}
-                {[["Name", selected.name], ["Phone", selected.phone], ["Email", selected.email], ["Joined", fmtDate(selected.joinDate)], ["Waiver", selected.waiverSigned ? "Signed" : "Not signed"]].map(([l, v]) => (
+                {[["Name", selected.name], ["Phone", selected.phone], ["Email", selected.email], ["Address", selected.address], ["Joined", fmtDate(selected.joinDate)], ["Waiver", selected.waiverSigned ? "Signed" : "Not signed"]].filter(([,v]) => v).map(([l, v]) => (
                   <div key={l}><b style={{ color: C.obsidian }}>{l}:</b> <span style={{ color: C.steel }}>{v}</span></div>
                 ))}
+                {(selected.vetName || selected.vetPhone) && (
+                  <div style={{ background: C.cream, borderRadius: 8, padding: "8px 12px", marginTop: 4 }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: C.silver, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Vet Info</div>
+                    {selected.vetName && <div style={{ fontSize: 13, color: C.steel }}>{selected.vetName}</div>}
+                    {selected.vetPhone && <div style={{ fontSize: 13, color: C.steel }}>{selected.vetPhone}</div>}
+                  </div>
+                )}
+                {selected.issues && (
+                  <div style={{ background: C.cream, borderRadius: 8, padding: "8px 12px", marginTop: 4 }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: C.silver, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>Training Goals</div>
+                    <div style={{ fontSize: 13, color: C.steel, fontStyle: "italic" }}>{selected.issues}</div>
+                  </div>
+                )}
               </div>
             )}
             {activeTab === "dogs" && (
