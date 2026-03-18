@@ -368,7 +368,7 @@ function UnifiedLogin({ onStaffLogin, onClientLogin, staff, clients, settings })
 // ─── CLIENT ONBOARDING ────────────────────────────────────────────────────────
 function Onboarding({ client, onComplete }) {
   const [step, setStep] = useState(1);
-  const [profile, setProfile] = useState({ name: "", email: "", phone: client.phone || "", address: "", vetName: "", vetPhone: "", issues: "" });
+  const [profile, setProfile] = useState({ name: "", email: "", phone: client.phone || "", street: "", city: "", state: "", zip: "", vetName: "", vetPhone: "", issues: "" });
   const [dogs, setDogs] = useState([]);
   const [dogForm, setDogForm] = useState({ name: "", breed: "", age: "", ageUnit: "years", sex: "Male", neutered: false, birthday: "", notes: "", photo: null, vaccineDoc: null });
   const [waiverChecked, setWaiverChecked] = useState(false);
@@ -418,7 +418,12 @@ function Onboarding({ client, onComplete }) {
               <Input label="Full Name *" placeholder="Jane Smith" value={profile.name} onChange={e => setProfile(p => ({ ...p, name: e.target.value }))} />
               <Input label="Email *" type="email" placeholder="you@email.com" value={profile.email} onChange={e => setProfile(p => ({ ...p, email: e.target.value }))} />
               <Input label="Phone *" value={profile.phone} onChange={e => setProfile(p => ({ ...p, phone: e.target.value }))} />
-              <Input label="Home Address" placeholder="123 Main St, City, State" value={profile.address} onChange={e => setProfile(p => ({ ...p, address: e.target.value }))} />
+              <Input label="Street Address" placeholder="123 Main St" value={profile.street} onChange={e => setProfile(p => ({ ...p, street: e.target.value }))} />
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10 }}>
+                <Input label="City" placeholder="Springfield" value={profile.city} onChange={e => setProfile(p => ({ ...p, city: e.target.value }))} />
+                <Input label="State" placeholder="VA" value={profile.state} onChange={e => setProfile(p => ({ ...p, state: e.target.value }))} />
+                <Input label="ZIP" placeholder="22150" value={profile.zip} onChange={e => setProfile(p => ({ ...p, zip: e.target.value }))} />
+              </div>
               <Btn full onClick={() => { if (profile.name && profile.email && profile.phone) setStep(2); else alert("Please fill in your name, email, and phone number."); }}>Continue →</Btn>
             </div>
           )}
@@ -494,7 +499,7 @@ function Onboarding({ client, onComplete }) {
               </label>
               <div style={{ display: "flex", gap: 10 }}>
                 <Btn variant="ghost" onClick={() => setStep(2)}>← Back</Btn>
-                <Btn full disabled={!waiverChecked || !policyChecked} onClick={() => onComplete({ ...client, ...profile, dogs, waiverSigned: true, joinDate: today })}>Create My Account →</Btn>
+                <Btn full disabled={!waiverChecked || !policyChecked} onClick={() => { const address = [profile.street, profile.city, profile.state, profile.zip].filter(Boolean).join(", "); onComplete({ ...client, ...profile, address, dogs, waiverSigned: true, joinDate: today }); }}>Create My Account →</Btn>
               </div>
             </div>
           )}
@@ -514,7 +519,11 @@ function BookSession({ client, setClient, setClients, discountCodes, giftCards, 
   const [selectedTime, setSelectedTime] = useState("");
   const [notes, setNotes] = useState("");
   // Intake form state (new clients only)
-  const [intake, setIntake] = useState({ name: client?.name || "", email: client?.email || "", address: "", issues: "", dogs: client?.dogs?.length > 0 ? client.dogs.map(d => ({ id: d.id, name: d.name, breed: d.breed || "", dob: d.birthday || "", weight: "" })) : [{ id: Date.now(), name: "", breed: "", dob: "", weight: "" }] });
+  const clientStreet = client?.street || (client?.address ? client.address.split(",")[0]?.trim() : "") || "";
+  const clientCity = client?.city || (client?.address ? client.address.split(",")[1]?.trim() : "") || "";
+  const clientState = client?.state || (client?.address ? client.address.split(",")[2]?.trim() : "") || "";
+  const clientZip = client?.zip || (client?.address ? client.address.split(",")[3]?.trim() : "") || "";
+  const [intake, setIntake] = useState({ name: client?.name || "", email: client?.email || "", street: clientStreet, city: clientCity, state: clientState, zip: clientZip, issues: "", dogs: client?.dogs?.length > 0 ? client.dogs.map(d => ({ id: d.id, name: d.name, breed: d.breed || "", dob: d.birthday || "", weight: "" })) : [{ id: Date.now(), name: "", breed: "", dob: "", weight: "" }] });
   const [discount, setDiscount] = useState("");
   const [discountApplied, setDiscountApplied] = useState(null);
   const [useCredit, setUseCredit] = useState(true);
@@ -675,7 +684,12 @@ function BookSession({ client, setClient, setClients, discountCodes, giftCards, 
           </div>
           <Input label="Full Name *" value={intake.name} onChange={e => setIntake(f => ({ ...f, name: e.target.value }))} />
           <Input label="Email *" type="email" value={intake.email} onChange={e => setIntake(f => ({ ...f, email: e.target.value }))} />
-          <Input label="Home Address" placeholder="123 Main St, City, State" value={intake.address} onChange={e => setIntake(f => ({ ...f, address: e.target.value }))} />
+          <Input label="Street Address" placeholder="123 Main St" value={intake.street} onChange={e => setIntake(f => ({ ...f, street: e.target.value }))} />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 10 }}>
+            <Input label="City" placeholder="Springfield" value={intake.city} onChange={e => setIntake(f => ({ ...f, city: e.target.value }))} />
+            <Input label="State" placeholder="VA" value={intake.state} onChange={e => setIntake(f => ({ ...f, state: e.target.value }))} />
+            <Input label="ZIP" placeholder="22150" value={intake.zip} onChange={e => setIntake(f => ({ ...f, zip: e.target.value }))} />
+          </div>
           <TextArea label="What issues are you hoping to work on?" placeholder="Leash pulling, jumping, recall, reactivity…" value={intake.issues} onChange={e => setIntake(f => ({ ...f, issues: e.target.value }))} />
 
           <div style={{ borderTop: `1px solid ${C.fog}`, paddingTop: 14 }}>
@@ -764,7 +778,11 @@ function BookSession({ client, setClient, setClients, discountCodes, giftCards, 
                   ...(client || {}),
                   name: intake.name,
                   email: intake.email,
-                  address: intake.address || client?.address || "",
+                  address: [intake.street, intake.city, intake.state, intake.zip].filter(Boolean).join(", ") || client?.address || "",
+                  street: intake.street || client?.street || "",
+                  city: intake.city || client?.city || "",
+                  state: intake.state || client?.state || "",
+                  zip: intake.zip || client?.zip || "",
                   issues: intake.issues || "",
                   dogs: intake.dogs.map(d => ({ ...d, age: d.dob ? Math.floor((new Date() - new Date(d.dob)) / (365.25 * 24 * 3600 * 1000)) : (client?.dogs?.find(x => x.id === d.id)?.age || 0), birthday: d.dob || "", breed: d.breed || "", sex: d.sex || "Unknown", neutered: false, notes: "", photo: null, vaccineDoc: null })),
                   joinDate: today,
@@ -789,7 +807,11 @@ function BookClass({ client, setClient, setClients, discountCodes, giftCards, cl
   const [selected, setSelected] = useState(null);
   const [step, setStep] = useState(1);
   // Intake (new clients only) — same as session PLUS vet info + vaccine upload
-  const [intake, setIntake] = useState({ name: client?.name || "", email: client?.email || "", address: "", issues: "", vetName: "", vetPhone: "", dogs: client?.dogs?.length > 0 ? client.dogs.map(d => ({ id: d.id, name: d.name, breed: d.breed || "", dob: d.birthday || "", weight: "", vaccineDoc: null })) : [{ id: Date.now(), name: "", breed: "", dob: "", weight: "", vaccineDoc: null }] });
+  const bcStreet = client?.street || (client?.address ? client.address.split(",")[0]?.trim() : "") || "";
+  const bcCity = client?.city || (client?.address ? client.address.split(",")[1]?.trim() : "") || "";
+  const bcState = client?.state || (client?.address ? client.address.split(",")[2]?.trim() : "") || "";
+  const bcZip = client?.zip || (client?.address ? client.address.split(",")[3]?.trim() : "") || "";
+  const [intake, setIntake] = useState({ name: client?.name || "", email: client?.email || "", street: bcStreet, city: bcCity, state: bcState, zip: bcZip, issues: "", vetName: client?.vetName || "", vetPhone: client?.vetPhone || "", dogs: client?.dogs?.length > 0 ? client.dogs.map(d => ({ id: d.id, name: d.name, breed: d.breed || "", dob: d.birthday || "", weight: "", vaccineDoc: null })) : [{ id: Date.now(), name: "", breed: "", dob: "", weight: "", vaccineDoc: null }] });
   const [discount, setDiscount] = useState("");
   const [discountApplied, setDiscountApplied] = useState(null);
   const [giftCode, setGiftCode] = useState("");
@@ -898,7 +920,12 @@ function BookClass({ client, setClient, setClients, discountCodes, giftCards, cl
           </div>
           <Input label="Full Name *" value={intake.name} onChange={e => setIntake(f => ({ ...f, name: e.target.value }))} />
           <Input label="Email *" type="email" value={intake.email} onChange={e => setIntake(f => ({ ...f, email: e.target.value }))} />
-          <Input label="Home Address" value={intake.address} onChange={e => setIntake(f => ({ ...f, address: e.target.value }))} />
+          <Input label="Street Address" placeholder="123 Main St" value={intake.street} onChange={e => setIntake(f => ({ ...f, street: e.target.value }))} />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 10 }}>
+            <Input label="City" placeholder="Springfield" value={intake.city} onChange={e => setIntake(f => ({ ...f, city: e.target.value }))} />
+            <Input label="State" placeholder="VA" value={intake.state} onChange={e => setIntake(f => ({ ...f, state: e.target.value }))} />
+            <Input label="ZIP" placeholder="22150" value={intake.zip} onChange={e => setIntake(f => ({ ...f, zip: e.target.value }))} />
+          </div>
           <TextArea label="What are you hoping your dog will get out of this class?" value={intake.issues} onChange={e => setIntake(f => ({ ...f, issues: e.target.value }))} />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
             <Input label="Veterinarian Name *" value={intake.vetName} onChange={e => setIntake(f => ({ ...f, vetName: e.target.value }))} />
@@ -1001,7 +1028,11 @@ function BookClass({ client, setClient, setClients, discountCodes, giftCards, cl
                     ...(client || {}),
                     name: intake.name,
                     email: intake.email,
-                    address: intake.address || client?.address || "",
+                    address: [intake.street, intake.city, intake.state, intake.zip].filter(Boolean).join(", ") || client?.address || "",
+                    street: intake.street || client?.street || "",
+                    city: intake.city || client?.city || "",
+                    state: intake.state || client?.state || "",
+                    zip: intake.zip || client?.zip || "",
                     vetName: intake.vetName || "",
                     vetPhone: intake.vetPhone || "",
                     dogs: intake.dogs.map(d => ({ ...d, age: d.dob ? Math.floor((new Date() - new Date(d.dob)) / (365.25 * 24 * 3600 * 1000)) : (client?.dogs?.find(x => x.id === d.id)?.age || 0), birthday: d.dob || "", breed: d.breed || "", sex: d.sex || "Unknown", neutered: false, notes: "", photo: null, vaccineDoc: d.vaccineDoc || null })),
